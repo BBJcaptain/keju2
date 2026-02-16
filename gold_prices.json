@@ -1,0 +1,46 @@
+{
+  "last_updated": "2026-02-16T12:00:00Z",
+  "uob_prices_sgd": {
+    "1kg_cast_buy": 85420.00,
+    "1kg_cast_sell": 84820.00
+  },
+  "gold_spot_usd_per_oz": {
+    "average": 2850.50,
+    "sources": {
+      "tradingview": 2851.20,
+      "cnbc": 2849.80
+    },
+    "source_count": 2,
+    "source_names": ["TradingView", "CNBC"]
+  },
+  "usd_sgd_rate": {
+    "average": 1.3245,
+    "sources": {
+      "cnbc": 1.3243,
+      "yahoo": 1.3247
+    },
+    "source_count": 2,
+    "source_names": ["CNBC", "Yahoo"]
+  },
+  "calculated": {
+    "spot_price_sgd_per_gram": 121.45,
+    "spot_price_sgd_per_kg": 121450.00,
+    "uob_1kg_premium_sgd": 420.00,
+    "uob_1kg_premium_percent": 0.35,
+    "uob_spread_sgd": 600.00,
+    "uob_spread_percent": 0.70
+  },
+  "status": {
+    "uob_success": true,
+    "gold_spot_success": true,
+    "forex_success": true,
+    "all_sources_success": true
+  },
+  "errors": {
+    "uob": null,
+    "tradingview_gold": null,
+    "cnbc_gold": null,
+    "cnbc_forex": null,
+    "yahoo_forex": null
+  }
+}
