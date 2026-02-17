@@ -5,10 +5,12 @@ Runs every 10 minutes via GitHub Actions
 
 Sources:
 1. UOB cast 1kg bar prices
-2. TradingView XAUUSD spot
-3. CNBC XAUUSD spot
-4. CNBC USD/SGD
-5. Yahoo Finance USD/SGD
+2. CNBC XAUUSD spot (web scraping)
+3. Metals.live XAUUSD spot (JSON API)
+4. GoldPrice.org XAUUSD spot (JSON API)
+5. CNBC USD/SGD (web scraping)
+6. ExchangeRate-API USD/SGD (JSON API)
+7. Frankfurter USD/SGD (JSON API, ECB data)
 """
 
 import json
@@ -26,48 +28,90 @@ def fetch_uob_prices():
     """Fetch UOB cast 1kg gold bar prices"""
     try:
         url = "https://www.uobgroup.com/wsm/gold-silver"
-        
+
         response = requests.get(url, headers=HEADERS, timeout=15)
         response.raise_for_status()
-        
-        # Parse as JSON
+
         data = response.json()
-        
-        # Extract 1kg cast bar prices - be flexible with naming
+
+        # Try multiple possible response structures
+        product_lists = []
+
+        # Structure 1: {products: [...]}
+        if isinstance(data.get('products'), list):
+            product_lists.append(data['products'])
+
+        # Structure 2: {goldProducts: [...]}
+        if isinstance(data.get('goldProducts'), list):
+            product_lists.append(data['goldProducts'])
+
+        # Structure 3: top-level array
+        if isinstance(data, list):
+            product_lists.append(data)
+
+        # Structure 4: nested under any key containing 'gold' or 'product'
+        if isinstance(data, dict):
+            for key, val in data.items():
+                if isinstance(val, list) and any(k in key.lower() for k in ['gold', 'product', 'item', 'price']):
+                    if val not in product_lists:
+                        product_lists.append(val)
+
         prices = {}
-        for item in data.get('products', []):
-            name = str(item.get('name', '')).lower()
-            weight = str(item.get('weight', '')).lower()
-            product_type = str(item.get('type', '')).lower()
-            
-            # Look for 1kg AND cast (or casted, casting, etc.)
-            is_1kg = '1 kg' in weight or '1kg' in weight or '1000g' in weight
-            is_cast = 'cast' in name or 'cast' in product_type or 'bar' in name
-            
-            if is_1kg and (is_cast or 'bar' in name):
-                prices['1kg_cast_buy'] = float(item.get('buyPrice', 0))
-                prices['1kg_cast_sell'] = float(item.get('sellPrice', 0))
-                print(f"  Found: {item.get('name', 'unknown')}")
-                break
-            
-            # Fallback: just get any 1kg if cast not found
-            if is_1kg and not prices:
-                prices['1kg_cast_buy'] = float(item.get('buyPrice', 0))
-                prices['1kg_cast_sell'] = float(item.get('sellPrice', 0))
-        
+        for items in product_lists:
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+
+                # Combine all text fields for matching
+                all_text = ' '.join(str(v).lower() for v in item.values() if isinstance(v, (str, int, float)))
+
+                is_1kg = any(t in all_text for t in ['1 kg', '1kg', '1000g', '1000 g'])
+                is_bar = any(t in all_text for t in ['cast', 'bar'])
+
+                if is_1kg and is_bar:
+                    # Try multiple field name patterns for buy/sell prices
+                    buy_keys = ['buyPrice', 'buyingPrice', 'buy_price', 'sellingPrice', 'selling_price', 'buy']
+                    sell_keys = ['sellPrice', 'sellingPrice', 'sell_price', 'buyingPrice', 'buying_price', 'sell']
+
+                    # UOB terminology: "selling price" = price UOB sells to you (you buy)
+                    # "buying price" = price UOB buys from you (you sell)
+                    for key in buy_keys:
+                        if key in item and float(item[key]) > 0:
+                            prices['1kg_cast_buy'] = float(item[key])
+                            break
+                    for key in sell_keys:
+                        if key in item and float(item[key]) > 0:
+                            prices['1kg_cast_sell'] = float(item[key])
+                            break
+
+                    item_name = item.get('name', item.get('productName', 'unknown'))
+                    print(f"  Found: {item_name}")
+                    break
+
+                # Fallback: just get any 1kg product
+                if is_1kg and not prices:
+                    for key in ['buyPrice', 'buyingPrice', 'sellingPrice', 'buy_price', 'buy']:
+                        if key in item and float(item.get(key, 0)) > 0:
+                            prices['1kg_cast_buy'] = float(item[key])
+                            break
+                    for key in ['sellPrice', 'sellingPrice', 'buyingPrice', 'sell_price', 'sell']:
+                        if key in item and float(item.get(key, 0)) > 0:
+                            prices['1kg_cast_sell'] = float(item[key])
+                            break
+
         if prices:
             return {
                 'success': True,
                 'prices': prices,
                 'source': 'UOB'
             }
-        
+
         return {
             'success': False,
-            'error': 'No 1kg bar found in products list',
+            'error': 'No 1kg bar found in response',
             'prices': {}
         }
-    
+
     except Exception as e:
         return {
             'success': False,
@@ -75,100 +119,36 @@ def fetch_uob_prices():
             'prices': {}
         }
 
-def fetch_fallback_gold():
-    """Fetch gold price from reliable API fallback"""
+def fetch_metals_live_gold():
+    """Fetch XAUUSD spot price from Metals.live API (free, no key)"""
     try:
-        # Using metals-api.com free endpoint
-        url = "https://api.metals.live/v1/spot/gold"
-        
+        url = "https://api.metals.live/v1/spot"
+
         response = requests.get(url, headers=HEADERS, timeout=10)
         response.raise_for_status()
         data = response.json()
-        
-        # Price is typically in data
-        price = float(data.get('price', 0))
-        
-        if 1000 < price < 8000:
+
+        # Response is a JSON array: [{"gold": 2650.50}, {"silver": 31.25}, ...]
+        price = None
+        if isinstance(data, list):
+            for item in data:
+                if isinstance(item, dict) and 'gold' in item:
+                    price = float(item['gold'])
+                    break
+
+        if price and 1000 < price < 10000:
             return {
                 'success': True,
                 'price': price,
                 'source': 'Metals.live'
             }
-        
+
         return {
             'success': False,
-            'error': 'Price out of range',
-            'price': 0
-        }
-    
-    except Exception as e:
-        # Try alternative: goldprice.org
-        try:
-            url2 = "https://data-asg.goldprice.org/dbXRates/USD"
-            response2 = requests.get(url2, timeout=10)
-            response2.raise_for_status()
-            data2 = response2.json()
-            
-            price = float(data2.get('items', [{}])[0].get('xauPrice', 0))
-            
-            if 1000 < price < 8000:
-                return {
-                    'success': True,
-                    'price': price,
-                    'source': 'GoldPrice.org'
-                }
-        except:
-            pass
-        
-        return {
-            'success': False,
-            'error': str(e),
+            'error': 'Gold price not found in response',
             'price': 0
         }
 
-def fetch_kitco_gold():
-    """Fetch XAUUSD from Kitco"""
-    try:
-        url = "https://www.kitco.com/market/gold"
-        
-        response = requests.get(url, headers=HEADERS, timeout=10)
-        response.raise_for_status()
-        
-        soup = BeautifulSoup(response.content, 'html.parser')
-        
-        # Look for gold price - Kitco has various selectors
-        price = None
-        
-        # Try to find bid price
-        for elem in soup.find_all(['span', 'div'], {'class': True}):
-            text = elem.get_text().strip()
-            classes = ' '.join(elem.get('class', [])).lower()
-            
-            if ('bid' in classes or 'price' in classes) and '$' in text:
-                try:
-                    # Extract number
-                    match = re.search(r'\$?([\d,]+\.?\d*)', text)
-                    if match:
-                        test_price = float(match.group(1).replace(',', ''))
-                        if 1000 < test_price < 8000:
-                            price = test_price
-                            break
-                except:
-                    pass
-        
-        if price:
-            return {
-                'success': True,
-                'price': price,
-                'source': 'Kitco'
-            }
-        
-        return {
-            'success': False,
-            'error': 'Price not found',
-            'price': 0
-        }
-    
     except Exception as e:
         return {
             'success': False,
@@ -176,94 +156,31 @@ def fetch_kitco_gold():
             'price': 0
         }
 
-def fetch_investing_gold():
-    """Fetch XAUUSD from Investing.com"""
+def fetch_goldprice_org():
+    """Fetch XAUUSD spot price from GoldPrice.org API (free, no key)"""
     try:
-        url = "https://www.investing.com/currencies/xau-usd"
-        
+        url = "https://data-asg.goldprice.org/dbXRates/USD"
+
         response = requests.get(url, headers=HEADERS, timeout=10)
         response.raise_for_status()
-        
-        soup = BeautifulSoup(response.content, 'html.parser')
-        
-        price = None
-        
-        # Investing.com uses various selectors
-        price_elem = soup.find('span', {'data-test': 'instrument-price-last'})
-        if price_elem:
-            try:
-                price_text = price_elem.get_text().strip()
-                price = float(re.sub(r'[^\d.]', '', price_text))
-            except:
-                pass
-        
-        # Alternative selector
-        if not price:
-            for elem in soup.find_all('span', {'class': True}):
-                classes = ' '.join(elem.get('class', [])).lower()
-                if 'last' in classes or 'price' in classes:
-                    try:
-                        text = elem.get_text().strip()
-                        test_price = float(re.sub(r'[^\d.]', '', text))
-                        if 1000 < test_price < 8000:
-                            price = test_price
-                            break
-                    except:
-                        pass
-        
-        if price and 1000 < price < 8000:
+        data = response.json()
+
+        # Response: {items: [{curr: "USD", xauPrice: 2650.50, ...}]}
+        price = float(data.get('items', [{}])[0].get('xauPrice', 0))
+
+        if price and 1000 < price < 10000:
             return {
                 'success': True,
                 'price': price,
-                'source': 'Investing.com'
+                'source': 'GoldPrice.org'
             }
-        
+
         return {
             'success': False,
-            'error': 'Price not found',
-            'price': 0
-        }
-    
-    except Exception as e:
-        return {
-            'success': False,
-            'error': str(e),
+            'error': f'Price out of range or missing: {price}',
             'price': 0
         }
 
-def fetch_tradingview_gold():
-    """Fetch XAUUSD spot price from TradingView"""
-    try:
-        url = "https://www.tradingview.com/symbols/XAUUSD/"
-        
-        response = requests.get(url, headers=HEADERS, timeout=10)
-        response.raise_for_status()
-        
-        soup = BeautifulSoup(response.content, 'html.parser')
-        
-        # TradingView often has price in meta tags or specific divs
-        # Look for the last price
-        price_elem = soup.find('span', {'class': re.compile(r'last.*price', re.I)})
-        if not price_elem:
-            # Try alternative selectors
-            price_elem = soup.find('div', {'data-symbol-last': True})
-        
-        if price_elem:
-            price_text = price_elem.get_text().strip()
-            price = float(re.sub(r'[^\d.]', '', price_text))
-            
-            return {
-                'success': True,
-                'price': price,
-                'source': 'TradingView'
-            }
-        
-        return {
-            'success': False,
-            'error': 'Price element not found',
-            'price': 0
-        }
-    
     except Exception as e:
         return {
             'success': False,
@@ -302,7 +219,7 @@ def fetch_cnbc_gold():
                         price_text = elem.get_text().strip()
                         test_price = float(re.sub(r'[^\d.]', '', price_text))
                         # Sanity check: gold should be $1000-$8000/oz
-                        if 1000 < test_price < 8000:
+                        if 1000 < test_price < 10000:
                             price = test_price
                             break
                     except:
@@ -318,12 +235,12 @@ def fetch_cnbc_gold():
                 if match:
                     try:
                         test_price = float(match.group(1).replace(',', ''))
-                        if 1000 < test_price < 8000:
+                        if 1000 < test_price < 10000:
                             price = test_price
                     except:
                         pass
         
-        if price and 1000 < price < 8000:
+        if price and 1000 < price < 10000:
             return {
                 'success': True,
                 'price': price,
@@ -380,40 +297,63 @@ def fetch_cnbc_usdsgd():
             'rate': 0
         }
 
-def fetch_yahoo_usdsgd():
-    """Fetch USD/SGD from Yahoo Finance"""
+def fetch_exchangerate_api_usdsgd():
+    """Fetch USD/SGD from ExchangeRate-API (free, no key)"""
     try:
-        url = "https://finance.yahoo.com/quote/SGD%3DX/"
-        
+        url = "https://open.er-api.com/v6/latest/USD"
+
         response = requests.get(url, headers=HEADERS, timeout=10)
         response.raise_for_status()
-        
-        soup = BeautifulSoup(response.content, 'html.parser')
-        
-        # Yahoo Finance price selector
-        price_elem = soup.find('fin-streamer', {'data-symbol': 'SGD=X', 'data-field': 'regularMarketPrice'})
-        if not price_elem:
-            # Alternative selector
-            price_elem = soup.find('span', {'data-reactid': re.compile(r'\d+')})
-            if price_elem and 'SGD' not in price_elem.get_text():
-                price_elem = None
-        
-        if price_elem:
-            price_text = price_elem.get_text().strip()
-            rate = float(re.sub(r'[^\d.]', '', price_text))
-            
+        data = response.json()
+
+        if data.get('result') == 'success':
+            rate = float(data['rates']['SGD'])
+
+            if 1.0 < rate < 2.0:
+                return {
+                    'success': True,
+                    'rate': rate,
+                    'source': 'ExchangeRate-API'
+                }
+
+        return {
+            'success': False,
+            'error': 'Rate not found or out of range',
+            'rate': 0
+        }
+
+    except Exception as e:
+        return {
+            'success': False,
+            'error': str(e),
+            'rate': 0
+        }
+
+def fetch_frankfurter_usdsgd():
+    """Fetch USD/SGD from Frankfurter API (free, no key, ECB data)"""
+    try:
+        url = "https://api.frankfurter.dev/v1/latest?base=USD&symbols=SGD"
+
+        response = requests.get(url, headers=HEADERS, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+
+        # Response: {amount: 1.0, base: "USD", date: "...", rates: {SGD: 1.34}}
+        rate = float(data.get('rates', {}).get('SGD', 0))
+
+        if 1.0 < rate < 2.0:
             return {
                 'success': True,
                 'rate': rate,
-                'source': 'Yahoo Finance'
+                'source': 'Frankfurter'
             }
-        
+
         return {
             'success': False,
-            'error': 'Rate element not found',
+            'error': f'Rate out of range or missing: {rate}',
             'rate': 0
         }
-    
+
     except Exception as e:
         return {
             'success': False,
@@ -435,66 +375,54 @@ def main():
         print(f"✓ UOB: Success ({uob_data.get('source', 'unknown')})")
     else:
         print(f"✗ UOB: Failed - {uob_data.get('error', 'unknown')}")
-    
-    # Fetch gold spot from TradingView
-    print("\n[2/7] Fetching XAUUSD from TradingView...")
-    tv_gold = fetch_tradingview_gold()
-    if tv_gold['success']:
-        print(f"✓ TradingView: ${tv_gold['price']:.2f}/oz")
-    else:
-        print(f"✗ TradingView: Failed - {tv_gold.get('error', 'unknown')}")
-    
-    # Fetch gold spot from CNBC
-    print("\n[3/7] Fetching XAUUSD from CNBC...")
+
+    # Fetch gold spot from CNBC (web scraping)
+    print("\n[2/7] Fetching XAUUSD from CNBC...")
     cnbc_gold = fetch_cnbc_gold()
     if cnbc_gold['success']:
         print(f"✓ CNBC Gold: ${cnbc_gold['price']:.2f}/oz")
     else:
         print(f"✗ CNBC Gold: Failed - {cnbc_gold.get('error', 'unknown')}")
-    
-    # Fetch gold spot from Kitco
-    print("\n[4/7] Fetching XAUUSD from Kitco...")
-    kitco_gold = fetch_kitco_gold()
-    if kitco_gold['success']:
-        print(f"✓ Kitco Gold: ${kitco_gold['price']:.2f}/oz")
+
+    # Fetch gold spot from Metals.live (JSON API)
+    print("\n[3/7] Fetching XAUUSD from Metals.live...")
+    metals_gold = fetch_metals_live_gold()
+    if metals_gold['success']:
+        print(f"✓ Metals.live Gold: ${metals_gold['price']:.2f}/oz")
     else:
-        print(f"✗ Kitco Gold: Failed - {kitco_gold.get('error', 'unknown')}")
-    
-    # Fetch gold spot from Investing.com
-    print("\n[5/7] Fetching XAUUSD from Investing.com...")
-    investing_gold = fetch_investing_gold()
-    if investing_gold['success']:
-        print(f"✓ Investing.com Gold: ${investing_gold['price']:.2f}/oz")
+        print(f"✗ Metals.live Gold: Failed - {metals_gold.get('error', 'unknown')}")
+
+    # Fetch gold spot from GoldPrice.org (JSON API)
+    print("\n[4/7] Fetching XAUUSD from GoldPrice.org...")
+    goldprice_gold = fetch_goldprice_org()
+    if goldprice_gold['success']:
+        print(f"✓ GoldPrice.org Gold: ${goldprice_gold['price']:.2f}/oz")
     else:
-        print(f"✗ Investing.com Gold: Failed - {investing_gold.get('error', 'unknown')}")
-    
-    # Fetch USD/SGD from CNBC
-    print("\n[6/7] Fetching USD/SGD from CNBC...")
+        print(f"✗ GoldPrice.org Gold: Failed - {goldprice_gold.get('error', 'unknown')}")
+
+    # Fetch USD/SGD from CNBC (web scraping)
+    print("\n[5/7] Fetching USD/SGD from CNBC...")
     cnbc_forex = fetch_cnbc_usdsgd()
     if cnbc_forex['success']:
         print(f"✓ CNBC Forex: {cnbc_forex['rate']:.4f}")
     else:
         print(f"✗ CNBC Forex: Failed - {cnbc_forex.get('error', 'unknown')}")
-    
-    # Fetch USD/SGD from Yahoo Finance
-    print("\n[7/7] Fetching USD/SGD from Yahoo Finance...")
-    yahoo_forex = fetch_yahoo_usdsgd()
-    if yahoo_forex['success']:
-        print(f"✓ Yahoo Finance: {yahoo_forex['rate']:.4f}")
+
+    # Fetch USD/SGD from ExchangeRate-API (JSON API)
+    print("\n[6/7] Fetching USD/SGD from ExchangeRate-API...")
+    er_forex = fetch_exchangerate_api_usdsgd()
+    if er_forex['success']:
+        print(f"✓ ExchangeRate-API: {er_forex['rate']:.4f}")
     else:
-        print(f"✗ Yahoo Finance: Failed - {yahoo_forex.get('error', 'unknown')}")
-    
-    # If multiple gold sources failed, try fallback API
-    fallback_gold = {'success': False, 'price': 0}
-    gold_success_count = sum([tv_gold['success'], cnbc_gold['success'], kitco_gold['success'], investing_gold['success']])
-    
-    if gold_success_count < 2:
-        print("\n[FALLBACK] Trying reliable gold price API...")
-        fallback_gold = fetch_fallback_gold()
-        if fallback_gold['success']:
-            print(f"✓ Fallback Gold API: ${fallback_gold['price']:.2f}/oz ({fallback_gold['source']})")
-        else:
-            print(f"✗ Fallback Gold API: Failed")
+        print(f"✗ ExchangeRate-API: Failed - {er_forex.get('error', 'unknown')}")
+
+    # Fetch USD/SGD from Frankfurter (JSON API)
+    print("\n[7/7] Fetching USD/SGD from Frankfurter...")
+    frank_forex = fetch_frankfurter_usdsgd()
+    if frank_forex['success']:
+        print(f"✓ Frankfurter: {frank_forex['rate']:.4f}")
+    else:
+        print(f"✗ Frankfurter: Failed - {frank_forex.get('error', 'unknown')}")
     
     print("\n" + "=" * 60)
     print("AGGREGATING DATA WITH CROSS-VALIDATION")
@@ -503,8 +431,8 @@ def main():
     # Collect all gold prices
     all_gold_prices = []
     all_gold_data = []
-    
-    for source_data in [tv_gold, cnbc_gold, kitco_gold, investing_gold, fallback_gold]:
+
+    for source_data in [cnbc_gold, metals_gold, goldprice_gold]:
         if source_data.get('success'):
             all_gold_prices.append(source_data['price'])
             all_gold_data.append(source_data)
@@ -543,14 +471,11 @@ def main():
     # Average USD/SGD rates from successful sources
     forex_rates = []
     forex_sources = []
-    
-    if cnbc_forex['success']:
-        forex_rates.append(cnbc_forex['rate'])
-        forex_sources.append('CNBC')
-    
-    if yahoo_forex['success']:
-        forex_rates.append(yahoo_forex['rate'])
-        forex_sources.append('Yahoo')
+
+    for fx_data in [cnbc_forex, er_forex, frank_forex]:
+        if fx_data.get('success'):
+            forex_rates.append(fx_data['rate'])
+            forex_sources.append(fx_data['source'])
     
     avg_usd_sgd = sum(forex_rates) / len(forex_rates) if forex_rates else 0
     
@@ -561,11 +486,9 @@ def main():
         'gold_spot_usd_per_oz': {
             'average': round(avg_gold_spot, 2),
             'sources': {
-                'tradingview': tv_gold.get('price', 0) if tv_gold['success'] else None,
                 'cnbc': cnbc_gold.get('price', 0) if cnbc_gold['success'] else None,
-                'kitco': kitco_gold.get('price', 0) if kitco_gold['success'] else None,
-                'investing': investing_gold.get('price', 0) if investing_gold['success'] else None,
-                'fallback': fallback_gold.get('price', 0) if fallback_gold.get('success') else None
+                'metals_live': metals_gold.get('price', 0) if metals_gold['success'] else None,
+                'goldprice_org': goldprice_gold.get('price', 0) if goldprice_gold['success'] else None
             },
             'source_count': len(gold_prices),
             'source_names': gold_sources,
@@ -575,7 +498,8 @@ def main():
             'average': round(avg_usd_sgd, 4),
             'sources': {
                 'cnbc': cnbc_forex.get('rate', 0) if cnbc_forex['success'] else None,
-                'yahoo': yahoo_forex.get('rate', 0) if yahoo_forex['success'] else None
+                'exchangerate_api': er_forex.get('rate', 0) if er_forex['success'] else None,
+                'frankfurter': frank_forex.get('rate', 0) if frank_forex['success'] else None
             },
             'source_count': len(forex_rates),
             'source_names': forex_sources
@@ -589,23 +513,22 @@ def main():
             'cross_validated': len(all_gold_prices) >= 3,
             'all_sources_success': all([
                 uob_data.get('success', False),
-                tv_gold.get('success', False),
                 cnbc_gold.get('success', False),
-                kitco_gold.get('success', False),
-                investing_gold.get('success', False),
+                metals_gold.get('success', False),
+                goldprice_gold.get('success', False),
                 cnbc_forex.get('success', False),
-                yahoo_forex.get('success', False)
+                er_forex.get('success', False),
+                frank_forex.get('success', False)
             ])
         },
         'errors': {
             'uob': uob_data.get('error', None),
-            'tradingview_gold': tv_gold.get('error', None),
             'cnbc_gold': cnbc_gold.get('error', None),
-            'kitco_gold': kitco_gold.get('error', None),
-            'investing_gold': investing_gold.get('error', None),
+            'metals_live_gold': metals_gold.get('error', None),
+            'goldprice_org_gold': goldprice_gold.get('error', None),
             'cnbc_forex': cnbc_forex.get('error', None),
-            'yahoo_forex': yahoo_forex.get('error', None),
-            'fallback_gold': fallback_gold.get('error', None) if fallback_gold.get('success') is not None else None
+            'exchangerate_api_forex': er_forex.get('error', None),
+            'frankfurter_forex': frank_forex.get('error', None)
         }
     }
     
@@ -661,10 +584,9 @@ def main():
     if avg_usd_sgd > 0:
         print(f"\nUSD/SGD Rate (averaged from {len(forex_rates)} sources):")
         print(f"  {avg_usd_sgd:.4f}")
-        if cnbc_forex['success']:
-            print(f"  - CNBC: {cnbc_forex['rate']:.4f}")
-        if yahoo_forex['success']:
-            print(f"  - Yahoo: {yahoo_forex['rate']:.4f}")
+        for fx_data in [cnbc_forex, er_forex, frank_forex]:
+            if fx_data.get('success'):
+                print(f"  - {fx_data['source']}: {fx_data['rate']:.4f}")
     
     if result.get('calculated'):
         print(f"\nCalculated Spot Prices:")
