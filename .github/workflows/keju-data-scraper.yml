@@ -1,4 +1,4 @@
-name: Fetch Gold Prices
+name: Keju Data Scraper (5 min) 
 
 on:
   schedule:
