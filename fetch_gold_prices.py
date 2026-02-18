@@ -1,19 +1,21 @@
+# New Implementation of fetch_uob_prices
+
+import requests
+from bs4 import BeautifulSoup
+
+
 def fetch_uob_prices():
-    import requests
-    import json
-
-    url = 'https://api.example.com/prices'
+    # URL for fetching gold prices
+    url = 'https://www.uobgroup.com/wsm/gold-silver'
     response = requests.get(url)
-    data = response.json()
+    if response.status_code != 200:
+        raise Exception('Failed to fetch data from UOB')
 
+    soup = BeautifulSoup(response.text, 'html.parser')
+
+    # Extract prices for 1kg cast bar and 100g argor
     prices = {}
-
-    for item in data.get('types', []):
-        description = item.get('description')
-        if description in ['ACB', 'CTB']:
-            prices[description] = {
-                'buy': item.get('bankBuy'),
-                'sell': item.get('bankSell')
-            }
+    prices['1kg_cast_bar'] = soup.find('div', {'id': '1kg_bar'}).text.strip()
+    prices['100g_argor'] = soup.find('div', {'id': '100g_argor'}).text.strip()
 
     return prices
