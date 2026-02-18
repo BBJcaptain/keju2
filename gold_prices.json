@@ -1,11 +1,11 @@
 {
-  "last_updated": "2026-02-18T09:35:37.860317Z",
+  "last_updated": "2026-02-18T09:37:12.538962Z",
   "uob_prices_sgd": "No Data",
   "gold_spot_usd_per_oz": {
-    "average": 4916.69,
+    "average": 4918.12,
     "sources": {
-      "cnbc": 4916.3269,
-      "goldprice_org": 4917.0475
+      "cnbc": 4917.61,
+      "goldprice_org": 4918.6275
     },
     "source_count": 2,
     "cross_validated": true
@@ -30,7 +30,7 @@
     "uob": "API: No 1kg bar found in JSON response | JSP: No 1kg bar found in HTML"
   },
   "calculated": {
-    "spot_price_sgd_per_gram": 199.73,
-    "spot_price_sgd_per_kg": 199730.03
+    "spot_price_sgd_per_gram": 199.79,
+    "spot_price_sgd_per_kg": 199788.19
   }
 }
