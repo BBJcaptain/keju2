@@ -12,7 +12,9 @@ Sources:
 5. USD/SGD forex - Source B: Frankfurter (JSON API, ECB data)
 """
 
+import csv
 import json
+import os
 import requests
 from bs4 import BeautifulSoup
 from datetime import datetime
@@ -396,6 +398,68 @@ def main():
         json.dump(result, f, indent=2)
 
     print("\n✓ Data saved to gold_prices.json")
+
+    # =================================================================
+    # APPEND TO history_2026.json
+    # =================================================================
+    history_file = 'history_2026.json'
+    try:
+        if os.path.exists(history_file):
+            with open(history_file, 'r') as f:
+                history = json.load(f)
+        else:
+            history = []
+        history.append(result)
+        with open(history_file, 'w') as f:
+            json.dump(history, f, indent=2)
+        print(f"✓ Data appended to {history_file} ({len(history)} records total)")
+    except Exception as e:
+        print(f"⚠ Failed to update {history_file}: {e}")
+
+    # =================================================================
+    # APPEND TO data/YYYY-MM.csv
+    # =================================================================
+    os.makedirs('data', exist_ok=True)
+    month_key = datetime.utcnow().strftime('%Y-%m')
+    csv_file = f'data/{month_key}.csv'
+
+    uob = result.get('uob_prices_sgd', {})
+    gold = result.get('gold_spot_usd_per_oz', {})
+    forex = result.get('usd_sgd_rate', {})
+    calc = result.get('calculated', {})
+
+    row = {
+        'timestamp':                result['last_updated'],
+        'uob_100g_buy':             uob.get('100g_cast_buy', '')        if isinstance(uob, dict)   else '',
+        'uob_100g_sell':            uob.get('100g_cast_sell', '')       if isinstance(uob, dict)   else '',
+        'uob_1kg_buy':              uob.get('1kg_cast_buy', '')         if isinstance(uob, dict)   else '',
+        'uob_1kg_sell':             uob.get('1kg_cast_sell', '')        if isinstance(uob, dict)   else '',
+        'gold_spot_usd_avg':        gold.get('average', '')             if isinstance(gold, dict)  else '',
+        'gold_spot_cnbc':           gold.get('sources', {}).get('cnbc', '')          if isinstance(gold, dict) else '',
+        'gold_spot_goldprice_org':  gold.get('sources', {}).get('goldprice_org', '') if isinstance(gold, dict) else '',
+        'gold_cross_validated':     gold.get('cross_validated', '')     if isinstance(gold, dict)  else '',
+        'usdsgd_avg':               forex.get('average', '')            if isinstance(forex, dict) else '',
+        'usdsgd_exchangerate_api':  forex.get('sources', {}).get('exchangerate_api', '') if isinstance(forex, dict) else '',
+        'usdsgd_frankfurter':       forex.get('sources', {}).get('frankfurter', '')      if isinstance(forex, dict) else '',
+        'forex_cross_validated':    forex.get('cross_validated', '')    if isinstance(forex, dict) else '',
+        'spot_sgd_per_gram':        calc.get('spot_price_sgd_per_gram', ''),
+        'spot_sgd_per_kg':          calc.get('spot_price_sgd_per_kg', ''),
+        'uob_1kg_premium_sgd':      calc.get('uob_1kg_premium_sgd', ''),
+        'uob_1kg_premium_pct':      calc.get('uob_1kg_premium_percent', ''),
+        'uob_spread_sgd':           calc.get('uob_spread_sgd', ''),
+        'uob_spread_pct':           calc.get('uob_spread_percent', ''),
+    }
+
+    try:
+        file_exists = os.path.exists(csv_file)
+        with open(csv_file, 'a', newline='') as f:
+            writer = csv.DictWriter(f, fieldnames=list(row.keys()))
+            if not file_exists:
+                writer.writeheader()
+            writer.writerow(row)
+        print(f"✓ Data appended to {csv_file}")
+    except Exception as e:
+        print(f"⚠ Failed to update {csv_file}: {e}")
 
     # =================================================================
     # SUMMARY
