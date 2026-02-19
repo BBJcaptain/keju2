@@ -462,6 +462,23 @@ def main():
         print(f"⚠ Failed to update {csv_file}: {e}")
 
     # =================================================================
+    # APPEND TO data/YYYY.csv  (annual)
+    # =================================================================
+    year_key = datetime.utcnow().strftime('%Y')
+    annual_csv_file = f'data/{year_key}.csv'
+
+    try:
+        file_exists = os.path.exists(annual_csv_file)
+        with open(annual_csv_file, 'a', newline='') as f:
+            writer = csv.DictWriter(f, fieldnames=list(row.keys()))
+            if not file_exists:
+                writer.writeheader()
+            writer.writerow(row)
+        print(f"✓ Data appended to {annual_csv_file}")
+    except Exception as e:
+        print(f"⚠ Failed to update {annual_csv_file}: {e}")
+
+    # =================================================================
     # SUMMARY
     # =================================================================
     print("\n" + "=" * 60)
