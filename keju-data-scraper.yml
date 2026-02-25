@@ -1,0 +1,1 @@
+name: Keju Data Scraper\nschedule:\n  cron: '*/15 * * * *'\n\non: [push]\n\njobs:\n  run-scraper:\n    runs-on: ubuntu-latest\n    steps:\n    - name: Checkout code\n      uses: actions/checkout@v2\n    - name: Run the scraper\n      run: python scraper.py
