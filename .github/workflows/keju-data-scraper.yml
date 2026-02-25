@@ -3,7 +3,7 @@ name: Keju Data Scraper (10 min)
 on:
   schedule:
     # Run every 10 minutes
-    - cron: '*/10 * * * *'
+    - cron: '*/15 * * * *'
   
   # Allow manual trigger
   workflow_dispatch:
