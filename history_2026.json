@@ -16117,5 +16117,50 @@
       "uob_spread_sgd": -2981.0,
       "uob_spread_percent": -1.41
     }
+  },
+  {
+    "last_updated": "2026-03-04T04:06:42.575596Z",
+    "uob_prices_sgd": {
+      "100g_cast_buy": 21138.0,
+      "100g_cast_sell": 21520.0,
+      "1kg_cast_buy": 211387.0,
+      "1kg_cast_sell": 214365.0
+    },
+    "gold_spot_usd_per_oz": {
+      "average": 5175.57,
+      "sources": {
+        "cnbc": 5175.5708,
+        "goldprice_org": "No Data"
+      },
+      "source_count": 1,
+      "cross_validated": false
+    },
+    "usd_sgd_rate": {
+      "average": 1.2778,
+      "sources": {
+        "exchangerate_api": 1.277508,
+        "frankfurter": 1.278
+      },
+      "source_count": 2,
+      "cross_validated": true
+    },
+    "status": {
+      "uob_success": true,
+      "gold_spot_sources": 1,
+      "forex_sources": 2,
+      "gold_cross_validated": false,
+      "forex_cross_validated": true
+    },
+    "errors": {
+      "goldprice_org": "403 Client Error: Forbidden for url: https://data-asg.goldprice.org/dbXRates/USD"
+    },
+    "calculated": {
+      "spot_price_sgd_per_gram": 212.62,
+      "spot_price_sgd_per_kg": 212616.15,
+      "uob_1kg_premium_sgd": -1229.15,
+      "uob_1kg_premium_percent": -0.58,
+      "uob_spread_sgd": -2978.0,
+      "uob_spread_percent": -1.41
+    }
   }
 ]
