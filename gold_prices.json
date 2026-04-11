@@ -1,11 +1,6 @@
 {
-  "last_updated": "2026-04-11T01:59:35.206377Z",
-  "uob_prices_sgd": {
-    "100g_cast_buy": 19419.0,
-    "100g_cast_sell": 19797.0,
-    "1kg_cast_buy": 194206.0,
-    "1kg_cast_sell": 197146.0
-  },
+  "last_updated": "2026-04-11T04:27:27.118172Z",
+  "uob_prices_sgd": "No Data",
   "gold_spot_usd_per_oz": {
     "average": 4747.49,
     "sources": {
@@ -25,21 +20,18 @@
     "cross_validated": true
   },
   "status": {
-    "uob_success": true,
+    "uob_success": false,
     "gold_spot_sources": 1,
     "forex_sources": 2,
     "gold_cross_validated": false,
     "forex_cross_validated": true
   },
   "errors": {
+    "uob": "Network error: HTTPSConnectionPool(host='www.uobgroup.com', port=443): Read timed out. (read timeout=30)",
     "goldprice_org": "403 Client Error: Forbidden for url: https://data-asg.goldprice.org/dbXRates/USD"
   },
   "calculated": {
     "spot_price_sgd_per_gram": 194.43,
-    "spot_price_sgd_per_kg": 194426.23,
-    "uob_1kg_premium_sgd": -220.23,
-    "uob_1kg_premium_percent": -0.11,
-    "uob_spread_sgd": -2940.0,
-    "uob_spread_percent": -1.51
+    "spot_price_sgd_per_kg": 194426.23
   }
 }
