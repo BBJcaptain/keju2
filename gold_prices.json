@@ -1,11 +1,6 @@
 {
-  "last_updated": "2026-04-17T22:21:26.367530Z",
-  "uob_prices_sgd": {
-    "100g_cast_buy": 19497.0,
-    "100g_cast_sell": 19875.0,
-    "1kg_cast_buy": 194977.0,
-    "1kg_cast_sell": 197920.0
-  },
+  "last_updated": "2026-04-17T23:21:59.696826Z",
+  "uob_prices_sgd": "No Data",
   "gold_spot_usd_per_oz": {
     "average": 4828.3,
     "sources": {
@@ -25,21 +20,18 @@
     "cross_validated": true
   },
   "status": {
-    "uob_success": true,
+    "uob_success": false,
     "gold_spot_sources": 1,
     "forex_sources": 2,
     "gold_cross_validated": false,
     "forex_cross_validated": true
   },
   "errors": {
+    "uob": "Network error: 500 Server Error: Internal Server Error for url: https://www.uobgroup.com/wsm/gold-silver",
     "goldprice_org": "403 Client Error: Forbidden for url: https://data-asg.goldprice.org/dbXRates/USD"
   },
   "calculated": {
     "spot_price_sgd_per_gram": 197.51,
-    "spot_price_sgd_per_kg": 197505.94,
-    "uob_1kg_premium_sgd": -2528.94,
-    "uob_1kg_premium_percent": -1.28,
-    "uob_spread_sgd": -2943.0,
-    "uob_spread_percent": -1.51
+    "spot_price_sgd_per_kg": 197505.94
   }
 }
