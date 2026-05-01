@@ -1,5 +1,5 @@
 {
-  "last_updated": "2026-05-01T08:30:59.169621Z",
+  "last_updated": "2026-05-01T09:06:59.929804Z",
   "uob_prices_sgd": {
     "100g_cast_buy": 18853.0,
     "100g_cast_sell": 19231.0,
@@ -7,13 +7,13 @@
     "1kg_cast_sell": 191484.0
   },
   "gold_spot_usd_per_oz": {
-    "average": 4566.02,
+    "average": 4573.41,
     "sources": {
-      "cnbc": 4566.02,
-      "metals_live": "No Data"
+      "cnbc": 4567.22,
+      "yahoo": 4579.60009765625
     },
-    "source_count": 1,
-    "cross_validated": false
+    "source_count": 2,
+    "cross_validated": true
   },
   "usd_sgd_rate": {
     "average": 1.2754,
@@ -26,19 +26,17 @@
   },
   "status": {
     "uob_success": true,
-    "gold_spot_sources": 1,
+    "gold_spot_sources": 2,
     "forex_sources": 2,
-    "gold_cross_validated": false,
+    "gold_cross_validated": true,
     "forex_cross_validated": true
   },
-  "errors": {
-    "metals_live_gold": "HTTPSConnectionPool(host='api.metals.live', port=443): Max retries exceeded with url: /v1/spot/gold (Caused by SSLError(SSLError(1, '[SSL: TLSV1_UNRECOGNIZED_NAME] tlsv1 unrecognized name (_ssl.c:1016)')))"
-  },
+  "errors": {},
   "calculated": {
-    "spot_price_sgd_per_gram": 187.23,
-    "spot_price_sgd_per_kg": 187226.34,
-    "uob_1kg_premium_sgd": 1318.66,
-    "uob_1kg_premium_percent": 0.7,
+    "spot_price_sgd_per_gram": 187.53,
+    "spot_price_sgd_per_kg": 187529.37,
+    "uob_1kg_premium_sgd": 1015.63,
+    "uob_1kg_premium_percent": 0.54,
     "uob_spread_sgd": -2939.0,
     "uob_spread_percent": -1.56
   }
