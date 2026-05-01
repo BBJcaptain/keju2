@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
 Fetch UOB gold prices, spot gold price, and USD/SGD exchange rate
-Runs every 10 minutes via GitHub Actions
+Runs every 15 minutes via GitHub Actions
 
 Sources:
-1. UOB gold bar prices (JSON API - UPDATED TO MATCH keju30.py)
+1. UOB gold bar prices (JSON API)
    https://www.uobgroup.com/wsm/gold-silver
 2. Gold spot XAUUSD - Source A: CNBC (web scraping)
-3. Gold spot XAUUSD - Source B: GoldPrice.org (JSON API)
+3. Gold spot XAUUSD - Source B: Yahoo Finance (JSON API)
 4. USD/SGD forex - Source A: ExchangeRate-API (JSON API)
 5. USD/SGD forex - Source B: Frankfurter (JSON API, ECB data)
 """
@@ -31,14 +31,11 @@ NO_DATA = 'No Data'
 
 
 # =============================================================================
-# UOB GOLD PRICES - UPDATED IMPLEMENTATION
+# UOB GOLD PRICES
 # =============================================================================
 
 def fetch_uob_prices():
-    """Fetch UOB cast 1kg and 100g gold bar prices from the JSON API.
-    Source: https://www.uobgroup.com/wsm/gold-silver
-    Implementation based on keju30.py working approach
-    """
+    """Fetch UOB cast 1kg and 100g gold bar prices from the JSON API."""
     errors = []
 
     try:
@@ -51,7 +48,6 @@ def fetch_uob_prices():
         argor_data = None
         cast_data = None
 
-        # The API returns a 'types' array with product information
         for item in data.get('types', []):
             description = str(item.get('description', '')).upper()
             unit = str(item.get('unit', '')).upper()
@@ -60,7 +56,6 @@ def fetch_uob_prices():
                 buy_price = float(item.get('bankBuy', 0))
                 sell_price = float(item.get('bankSell', 0))
 
-                # Look for Argor 100g Cast Bar (ACB = Argor Cast Bar)
                 if description == 'ACB' and '100 GM' in unit:
                     argor_data = {
                         'buy': buy_price,
@@ -69,7 +64,6 @@ def fetch_uob_prices():
                     }
                     print(f"  ✓ Found: Argor 100g - Buy {buy_price}, Sell {sell_price}")
 
-                # Look for Cast 1kg Bar (CTB = Cast Bar)
                 elif description == 'CTB' and '1 KILOBAR' in unit:
                     cast_data = {
                         'buy': buy_price,
@@ -82,7 +76,6 @@ def fetch_uob_prices():
                 print(f"  ⚠ Price parsing error for item: {e}")
                 continue
 
-        # Return success only if we found both products
         if argor_data and cast_data:
             return {
                 'success': True,
@@ -165,20 +158,21 @@ def fetch_cnbc_gold():
         return {'success': False, 'error': str(e), 'price': 0}
 
 
-def fetch_goldprice_org():
-    """Gold spot source B: GoldPrice.org JSON API (free, no key)"""
+def fetch_yahoo_gold():
+    """Gold spot source B: Yahoo Finance (free, no key)"""
     try:
-        url = "https://data-asg.goldprice.org/dbXRates/USD"
-        response = requests.get(url, headers=HEADERS, timeout=10)
+        url = "https://query1.finance.yahoo.com/v8/finance/chart/GC=F"
+        headers = {**HEADERS, 'Accept': 'application/json'}
+        response = requests.get(url, headers=headers, timeout=10)
         response.raise_for_status()
         data = response.json()
 
-        price = float(data.get('items', [{}])[0].get('xauPrice', 0))
+        price = float(data['chart']['result'][0]['meta']['regularMarketPrice'])
 
-        if price and 1000 < price < 10000:
-            return {'success': True, 'price': price, 'source': 'GoldPrice.org'}
+        if 1000 < price < 10000:
+            return {'success': True, 'price': price, 'source': 'Yahoo Finance'}
 
-        return {'success': False, 'error': f'Price out of range or missing: {price}', 'price': 0}
+        return {'success': False, 'error': f'Price out of range: {price}', 'price': 0}
 
     except Exception as e:
         return {'success': False, 'error': str(e), 'price': 0}
@@ -231,7 +225,6 @@ def fetch_frankfurter_usdsgd():
 # =============================================================================
 
 def main():
-    """Main function to fetch all data and save to JSON"""
     print("=" * 60)
     print("FETCHING GOLD PRICES FROM MULTIPLE SOURCES")
     print("=" * 60)
@@ -254,12 +247,12 @@ def main():
         print(f"  ✗ CNBC Gold: Failed - {gold_a.get('error', 'unknown')}")
 
     # --- Gold Spot Source B ---
-    print("\n[3/5] Fetching XAUUSD from GoldPrice.org...")
-    gold_b = fetch_goldprice_org()
+    print("\n[3/5] Fetching XAUUSD from Yahoo Finance...")
+    gold_b = fetch_yahoo_gold()
     if gold_b['success']:
-        print(f"  ✓ GoldPrice.org Gold: ${gold_b['price']:.2f}/oz")
+        print(f"  ✓ Yahoo Finance Gold: ${gold_b['price']:.2f}/oz")
     else:
-        print(f"  ✗ GoldPrice.org Gold: Failed - {gold_b.get('error', 'unknown')}")
+        print(f"  ✗ Yahoo Finance Gold: Failed - {gold_b.get('error', 'unknown')}")
 
     # --- Forex Source A ---
     print("\n[4/5] Fetching USD/SGD from ExchangeRate-API...")
@@ -284,7 +277,6 @@ def main():
     print("AGGREGATING DATA WITH CROSS-VALIDATION")
     print("=" * 60)
 
-    # Collect gold spot prices from both sources
     gold_sources_data = []
     for src in [gold_a, gold_b]:
         if src.get('success'):
@@ -302,7 +294,6 @@ def main():
     else:
         print(f"\n  Gold Spot: {NO_DATA}")
 
-    # Collect forex rates from both sources
     forex_sources_data = []
     for src in [forex_a, forex_b]:
         if src.get('success'):
@@ -330,7 +321,7 @@ def main():
             'average': round(gold_spot_avg, 2) if gold_spot_avg else NO_DATA,
             'sources': {
                 'cnbc': gold_a.get('price', 0) if gold_a['success'] else NO_DATA,
-                'goldprice_org': gold_b.get('price', 0) if gold_b['success'] else NO_DATA,
+                'yahoo': gold_b.get('price', 0) if gold_b['success'] else NO_DATA,
             },
             'source_count': len(gold_sources_data),
             'cross_validated': len(gold_sources_data) >= 2
@@ -354,21 +345,18 @@ def main():
         'errors': {}
     }
 
-    # Only include errors for failed sources
     if not uob_data['success']:
         result['errors']['uob'] = uob_data.get('error', 'unknown')
     if not gold_a['success']:
         result['errors']['cnbc_gold'] = gold_a.get('error', 'unknown')
     if not gold_b['success']:
-        result['errors']['goldprice_org'] = gold_b.get('error', 'unknown')
+        result['errors']['yahoo_gold'] = gold_b.get('error', 'unknown')
     if not forex_a['success']:
         result['errors']['exchangerate_api'] = forex_a.get('error', 'unknown')
     if not forex_b['success']:
         result['errors']['frankfurter'] = forex_b.get('error', 'unknown')
 
-    # Calculate derived values ONLY if both gold spot and forex have data
     if gold_spot_avg and forex_avg:
-        # 1 troy oz = 31.1035 grams
         sgd_per_gram = (gold_spot_avg * forex_avg) / 31.1035
 
         result['calculated'] = {
@@ -376,7 +364,6 @@ def main():
             'spot_price_sgd_per_kg': round(sgd_per_gram * 1000, 2)
         }
 
-        # Calculate premiums/spreads for UOB prices
         if uob_data.get('prices', {}).get('1kg_cast_buy'):
             uob_buy = uob_data['prices']['1kg_cast_buy']
             spot_kg = result['calculated']['spot_price_sgd_per_kg']
@@ -393,7 +380,6 @@ def main():
                 result['calculated']['uob_spread_sgd'] = round(spread, 2)
                 result['calculated']['uob_spread_percent'] = round(spread_pct, 2)
 
-    # Save to file
     with open('gold_prices.json', 'w') as f:
         json.dump(result, f, indent=2)
 
@@ -429,25 +415,25 @@ def main():
     calc = result.get('calculated', {})
 
     row = {
-        'timestamp':                result['last_updated'],
-        'uob_100g_buy':             uob.get('100g_cast_buy', '')        if isinstance(uob, dict)   else '',
-        'uob_100g_sell':            uob.get('100g_cast_sell', '')       if isinstance(uob, dict)   else '',
-        'uob_1kg_buy':              uob.get('1kg_cast_buy', '')         if isinstance(uob, dict)   else '',
-        'uob_1kg_sell':             uob.get('1kg_cast_sell', '')        if isinstance(uob, dict)   else '',
-        'gold_spot_usd_avg':        gold.get('average', '')             if isinstance(gold, dict)  else '',
-        'gold_spot_cnbc':           gold.get('sources', {}).get('cnbc', '')          if isinstance(gold, dict) else '',
-        'gold_spot_goldprice_org':  gold.get('sources', {}).get('goldprice_org', '') if isinstance(gold, dict) else '',
-        'gold_cross_validated':     gold.get('cross_validated', '')     if isinstance(gold, dict)  else '',
-        'usdsgd_avg':               forex.get('average', '')            if isinstance(forex, dict) else '',
-        'usdsgd_exchangerate_api':  forex.get('sources', {}).get('exchangerate_api', '') if isinstance(forex, dict) else '',
-        'usdsgd_frankfurter':       forex.get('sources', {}).get('frankfurter', '')      if isinstance(forex, dict) else '',
-        'forex_cross_validated':    forex.get('cross_validated', '')    if isinstance(forex, dict) else '',
-        'spot_sgd_per_gram':        calc.get('spot_price_sgd_per_gram', ''),
-        'spot_sgd_per_kg':          calc.get('spot_price_sgd_per_kg', ''),
-        'uob_1kg_premium_sgd':      calc.get('uob_1kg_premium_sgd', ''),
-        'uob_1kg_premium_pct':      calc.get('uob_1kg_premium_percent', ''),
-        'uob_spread_sgd':           calc.get('uob_spread_sgd', ''),
-        'uob_spread_pct':           calc.get('uob_spread_percent', ''),
+        'timestamp':               result['last_updated'],
+        'uob_100g_buy':            uob.get('100g_cast_buy', '')       if isinstance(uob, dict)  else '',
+        'uob_100g_sell':           uob.get('100g_cast_sell', '')      if isinstance(uob, dict)  else '',
+        'uob_1kg_buy':             uob.get('1kg_cast_buy', '')        if isinstance(uob, dict)  else '',
+        'uob_1kg_sell':            uob.get('1kg_cast_sell', '')       if isinstance(uob, dict)  else '',
+        'gold_spot_usd_avg':       gold.get('average', '')            if isinstance(gold, dict) else '',
+        'gold_spot_cnbc':          gold.get('sources', {}).get('cnbc', '')  if isinstance(gold, dict) else '',
+        'gold_spot_yahoo':         gold.get('sources', {}).get('yahoo', '') if isinstance(gold, dict) else '',
+        'gold_cross_validated':    gold.get('cross_validated', '')    if isinstance(gold, dict) else '',
+        'usdsgd_avg':              forex.get('average', '')           if isinstance(forex, dict) else '',
+        'usdsgd_exchangerate_api': forex.get('sources', {}).get('exchangerate_api', '') if isinstance(forex, dict) else '',
+        'usdsgd_frankfurter':      forex.get('sources', {}).get('frankfurter', '')      if isinstance(forex, dict) else '',
+        'forex_cross_validated':   forex.get('cross_validated', '')   if isinstance(forex, dict) else '',
+        'spot_sgd_per_gram':       calc.get('spot_price_sgd_per_gram', ''),
+        'spot_sgd_per_kg':         calc.get('spot_price_sgd_per_kg', ''),
+        'uob_1kg_premium_sgd':     calc.get('uob_1kg_premium_sgd', ''),
+        'uob_1kg_premium_pct':     calc.get('uob_1kg_premium_percent', ''),
+        'uob_spread_sgd':          calc.get('uob_spread_sgd', ''),
+        'uob_spread_pct':          calc.get('uob_spread_percent', ''),
     }
 
     try:
@@ -485,7 +471,6 @@ def main():
     print("SUMMARY")
     print("=" * 60)
 
-    # UOB
     print("\nUOB Prices:")
     if uob_data['success'] and uob_data.get('prices'):
         if uob_data['prices'].get('1kg_cast_buy'):
@@ -499,22 +484,20 @@ def main():
     else:
         print(f"  {NO_DATA}")
 
-    # Gold spot
     print(f"\nGold Spot (USD/oz):")
     if gold_a['success']:
         print(f"  - CNBC: ${gold_a['price']:.2f}")
     else:
         print(f"  - CNBC: {NO_DATA}")
     if gold_b['success']:
-        print(f"  - GoldPrice.org: ${gold_b['price']:.2f}")
+        print(f"  - Yahoo Finance: ${gold_b['price']:.2f}")
     else:
-        print(f"  - GoldPrice.org: {NO_DATA}")
+        print(f"  - Yahoo Finance: {NO_DATA}")
     if gold_spot_avg:
         print(f"  Average: ${gold_spot_avg:.2f}/oz")
     else:
         print(f"  Average: {NO_DATA}")
 
-    # Forex
     print(f"\nUSD/SGD Rate:")
     if forex_a['success']:
         print(f"  - ExchangeRate-API: {forex_a['rate']:.4f}")
@@ -529,7 +512,6 @@ def main():
     else:
         print(f"  Average: {NO_DATA}")
 
-    # Calculated values
     if result.get('calculated'):
         print(f"\nCalculated Spot Prices:")
         print(f"  ${result['calculated']['spot_price_sgd_per_gram']:.2f}/gram SGD")
@@ -544,7 +526,6 @@ def main():
 
     print("\n" + "=" * 60)
 
-    # Validation summary
     gold_ok = len(gold_sources_data) >= 2
     forex_ok = len(forex_sources_data) >= 2
 
@@ -562,7 +543,6 @@ def main():
     else:
         print(f"⚠ UOB prices: {NO_DATA}")
 
-    # Exit with error if no gold or forex data at all
     if len(gold_sources_data) == 0 or len(forex_sources_data) == 0:
         print("\n⚠ CRITICAL: Missing gold spot or forex data entirely")
         sys.exit(1)
