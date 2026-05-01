@@ -1,39 +1,38 @@
-name: Keju Data Scraper (15 min) 
+name: Keju Scraper A (:07)
 
 on:
   schedule:
-    # Run every 10 minutes
-    - cron: '*/20 * * * *'
-  
-  # Allow manual trigger
+    - cron: '7 * * * *'
   workflow_dispatch:
-  
-  # Run on push to main
   push:
     branches: [ main ]
+
+concurrency:
+  group: keju-scraper
+  cancel-in-progress: false
 
 jobs:
   fetch-prices:
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
-      
+
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
         python-version: '3.11'
-        
+
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install requests beautifulsoup4
-        
+
     - name: Fetch gold prices
       run: |
         python fetch_gold_prices.py
-        
+
     - name: Commit and push if changed
       run: |
         git config --local user.email "github-actions[bot]@users.noreply.github.com"
