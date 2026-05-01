@@ -7,7 +7,7 @@ Sources:
 1. UOB gold bar prices (JSON API)
    https://www.uobgroup.com/wsm/gold-silver
 2. Gold spot XAUUSD - Source A: CNBC (web scraping)
-3. Gold spot XAUUSD - Source B: metals.live (JSON API)
+3. Gold spot XAUUSD - Source B: Yahoo Finance via yfinance
 4. USD/SGD forex - Source A: ExchangeRate-API (JSON API)
 5. USD/SGD forex - Source B: Frankfurter (JSON API, ECB data)
 """
@@ -158,23 +158,15 @@ def fetch_cnbc_gold():
         return {'success': False, 'error': str(e), 'price': 0}
 
 
-def fetch_metals_live_gold():
-    """Gold spot source B: metals.live (free, no key)"""
+def fetch_yfinance_gold():
+    """Gold spot source B: Yahoo Finance via yfinance package"""
     try:
-        url = "https://api.metals.live/v1/spot/gold"
-        response = requests.get(url, headers=HEADERS, timeout=10)
-        response.raise_for_status()
-        data = response.json()
+        import yfinance as yf
+        ticker = yf.Ticker("GC=F")
+        price = ticker.fast_info.last_price
 
-        if isinstance(data, dict):
-            price = float(data.get('price', 0) or data.get('gold', 0))
-        elif isinstance(data, list) and len(data) > 0:
-            price = float(data[0].get('price', 0) or data[0].get('gold', 0))
-        else:
-            price = 0
-
-        if 1000 < price < 10000:
-            return {'success': True, 'price': price, 'source': 'metals.live'}
+        if price and 1000 < float(price) < 10000:
+            return {'success': True, 'price': float(price), 'source': 'Yahoo Finance'}
 
         return {'success': False, 'error': f'Price out of range or missing: {price}', 'price': 0}
 
@@ -251,12 +243,12 @@ def main():
         print(f"  ✗ CNBC Gold: Failed - {gold_a.get('error', 'unknown')}")
 
     # --- Gold Spot Source B ---
-    print("\n[3/5] Fetching XAUUSD from metals.live...")
-    gold_b = fetch_metals_live_gold()
+    print("\n[3/5] Fetching XAUUSD from Yahoo Finance (yfinance)...")
+    gold_b = fetch_yfinance_gold()
     if gold_b['success']:
-        print(f"  ✓ metals.live Gold: ${gold_b['price']:.2f}/oz")
+        print(f"  ✓ Yahoo Finance Gold: ${gold_b['price']:.2f}/oz")
     else:
-        print(f"  ✗ metals.live Gold: Failed - {gold_b.get('error', 'unknown')}")
+        print(f"  ✗ Yahoo Finance Gold: Failed - {gold_b.get('error', 'unknown')}")
 
     # --- Forex Source A ---
     print("\n[4/5] Fetching USD/SGD from ExchangeRate-API...")
@@ -325,7 +317,7 @@ def main():
             'average': round(gold_spot_avg, 2) if gold_spot_avg else NO_DATA,
             'sources': {
                 'cnbc': gold_a.get('price', 0) if gold_a['success'] else NO_DATA,
-                'metals_live': gold_b.get('price', 0) if gold_b['success'] else NO_DATA,
+                'yahoo': gold_b.get('price', 0) if gold_b['success'] else NO_DATA,
             },
             'source_count': len(gold_sources_data),
             'cross_validated': len(gold_sources_data) >= 2
@@ -354,7 +346,7 @@ def main():
     if not gold_a['success']:
         result['errors']['cnbc_gold'] = gold_a.get('error', 'unknown')
     if not gold_b['success']:
-        result['errors']['metals_live_gold'] = gold_b.get('error', 'unknown')
+        result['errors']['yahoo_gold'] = gold_b.get('error', 'unknown')
     if not forex_a['success']:
         result['errors']['exchangerate_api'] = forex_a.get('error', 'unknown')
     if not forex_b['success']:
@@ -425,8 +417,8 @@ def main():
         'uob_1kg_buy':             uob.get('1kg_cast_buy', '')        if isinstance(uob, dict)  else '',
         'uob_1kg_sell':            uob.get('1kg_cast_sell', '')       if isinstance(uob, dict)  else '',
         'gold_spot_usd_avg':       gold.get('average', '')            if isinstance(gold, dict) else '',
-        'gold_spot_cnbc':          gold.get('sources', {}).get('cnbc', '')         if isinstance(gold, dict) else '',
-        'gold_spot_metals_live':   gold.get('sources', {}).get('metals_live', '')  if isinstance(gold, dict) else '',
+        'gold_spot_cnbc':          gold.get('sources', {}).get('cnbc', '')   if isinstance(gold, dict) else '',
+        'gold_spot_yahoo':         gold.get('sources', {}).get('yahoo', '')  if isinstance(gold, dict) else '',
         'gold_cross_validated':    gold.get('cross_validated', '')    if isinstance(gold, dict) else '',
         'usdsgd_avg':              forex.get('average', '')           if isinstance(forex, dict) else '',
         'usdsgd_exchangerate_api': forex.get('sources', {}).get('exchangerate_api', '') if isinstance(forex, dict) else '',
@@ -494,9 +486,9 @@ def main():
     else:
         print(f"  - CNBC: {NO_DATA}")
     if gold_b['success']:
-        print(f"  - metals.live: ${gold_b['price']:.2f}")
+        print(f"  - Yahoo Finance: ${gold_b['price']:.2f}")
     else:
-        print(f"  - metals.live: {NO_DATA}")
+        print(f"  - Yahoo Finance: {NO_DATA}")
     if gold_spot_avg:
         print(f"  Average: ${gold_spot_avg:.2f}/oz")
     else:
