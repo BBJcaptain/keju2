@@ -1,5 +1,5 @@
 {
-  "last_updated": "2026-05-02T14:58:17.434195Z",
+  "last_updated": "2026-05-02T15:07:41.070251Z",
   "uob_prices_sgd": {
     "100g_cast_buy": 18853.0,
     "100g_cast_sell": 19231.0,
@@ -9,7 +9,7 @@
   "gold_spot_usd_per_oz": {
     "average": 4621.76,
     "sources": {
-      "cnbc": 4613.6201,
+      "cnbc": 4613.62,
       "yahoo": 4629.89990234375
     },
     "source_count": 2,
