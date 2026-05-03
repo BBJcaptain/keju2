@@ -7,7 +7,7 @@ Sources:
 1. UOB gold bar prices (JSON API)
    https://www.uobgroup.com/wsm/gold-silver
 2. Gold spot XAUUSD - Source A: CNBC (web scraping)
-3. Gold spot XAUUSD - Source B: Yahoo Finance via yfinance
+3. Gold spot XAUUSD - Source B: Yahoo Finance XAUUSD=X (24/7 OTC, falls back to GC=F)
 4. USD/SGD forex - Source A: ExchangeRate-API (JSON API)
 5. USD/SGD forex - Source B: Frankfurter (JSON API, ECB data)
 """
@@ -17,7 +17,7 @@ import json
 import os
 import requests
 from bs4 import BeautifulSoup
-from datetime import datetime
+from datetime import datetime, timezone
 import sys
 import re
 
@@ -28,6 +28,11 @@ HEADERS = {
 }
 
 NO_DATA = 'No Data'
+
+# COMEX market hours: Mon 23:00 UTC – Fri 22:00 UTC (approximate)
+# Outside these hours CNBC and GC=F serve stale cached prices.
+# XAUUSD=X is an OTC forex pair that continues updating on weekends.
+STALE_CONSEC_RUNS = 2  # flag stale after this many unchanged consecutive runs
 
 
 # =============================================================================
@@ -159,16 +164,24 @@ def fetch_cnbc_gold():
 
 
 def fetch_yfinance_gold():
-    """Gold spot source B: Yahoo Finance via yfinance package"""
+    """Gold spot source B: Yahoo Finance XAUUSD=X (24/7 OTC), falling back to GC=F futures.
+
+    XAUUSD=X is the interbank OTC forex spot rate for gold and updates continuously
+    including weekends, unlike GC=F (COMEX futures) which freezes after Friday close.
+    """
     try:
         import yfinance as yf
-        ticker = yf.Ticker("GC=F")
-        price = ticker.fast_info.last_price
 
-        if price and 1000 < float(price) < 10000:
-            return {'success': True, 'price': float(price), 'source': 'Yahoo Finance'}
+        for ticker_sym in ["XAUUSD=X", "GC=F"]:
+            try:
+                ticker = yf.Ticker(ticker_sym)
+                price = ticker.fast_info.last_price
+                if price and 1000 < float(price) < 10000:
+                    return {'success': True, 'price': float(price), 'source': f'Yahoo Finance ({ticker_sym})'}
+            except Exception:
+                continue
 
-        return {'success': False, 'error': f'Price out of range or missing: {price}', 'price': 0}
+        return {'success': False, 'error': 'All tickers failed or price out of range', 'price': 0}
 
     except Exception as e:
         return {'success': False, 'error': str(e), 'price': 0}
@@ -217,6 +230,47 @@ def fetch_frankfurter_usdsgd():
 
 
 # =============================================================================
+# STALENESS DETECTION
+# =============================================================================
+
+def detect_spot_stale(csv_file, current_avg):
+    """Return True if gold_spot_usd_avg has been unchanged for STALE_CONSEC_RUNS+ rows.
+
+    Reads the tail of the existing CSV and compares the last N values of
+    gold_spot_usd_avg to the current value. A frozen value across multiple
+    consecutive scraper runs (outside market hours) indicates a stale cached price.
+    """
+    if current_avg is None:
+        return False
+    try:
+        if not os.path.exists(csv_file):
+            return False
+        with open(csv_file, 'r', newline='') as f:
+            rows = list(csv.DictReader(f))
+        if len(rows) < STALE_CONSEC_RUNS:
+            return False
+        tail = rows[-STALE_CONSEC_RUNS:]
+        return all(
+            r.get('gold_spot_usd_avg') and abs(float(r['gold_spot_usd_avg']) - current_avg) < 0.01
+            for r in tail
+        )
+    except Exception:
+        return False
+
+
+def get_csv_fieldnames(csv_file):
+    """Return fieldnames from existing CSV header, or None if file doesn't exist."""
+    if not os.path.exists(csv_file):
+        return None
+    try:
+        with open(csv_file, 'r', newline='') as f:
+            reader = csv.DictReader(f)
+            return list(reader.fieldnames) if reader.fieldnames else None
+    except Exception:
+        return None
+
+
+# =============================================================================
 # MAIN
 # =============================================================================
 
@@ -243,10 +297,10 @@ def main():
         print(f"  ✗ CNBC Gold: Failed - {gold_a.get('error', 'unknown')}")
 
     # --- Gold Spot Source B ---
-    print("\n[3/5] Fetching XAUUSD from Yahoo Finance (yfinance)...")
+    print("\n[3/5] Fetching XAUUSD from Yahoo Finance (XAUUSD=X, 24/7 OTC)...")
     gold_b = fetch_yfinance_gold()
     if gold_b['success']:
-        print(f"  ✓ Yahoo Finance Gold: ${gold_b['price']:.2f}/oz")
+        print(f"  ✓ {gold_b['source']}: ${gold_b['price']:.2f}/oz")
     else:
         print(f"  ✗ Yahoo Finance Gold: Failed - {gold_b.get('error', 'unknown')}")
 
@@ -311,7 +365,7 @@ def main():
     # BUILD RESULT JSON
     # =================================================================
     result = {
-        'last_updated': datetime.utcnow().isoformat() + 'Z',
+        'last_updated': datetime.now(timezone.utc).isoformat(),
         'uob_prices_sgd': uob_data.get('prices', {}) if uob_data['success'] else NO_DATA,
         'gold_spot_usd_per_oz': {
             'average': round(gold_spot_avg, 2) if gold_spot_avg else NO_DATA,
@@ -402,7 +456,7 @@ def main():
     # APPEND TO data/YYYY-MM.csv
     # =================================================================
     os.makedirs('data', exist_ok=True)
-    month_key = datetime.utcnow().strftime('%Y-%m')
+    month_key = datetime.now(timezone.utc).strftime('%Y-%m')
     csv_file = f'data/{month_key}.csv'
 
     uob = result.get('uob_prices_sgd', {})
@@ -410,7 +464,13 @@ def main():
     forex = result.get('usd_sgd_rate', {})
     calc = result.get('calculated', {})
 
-    row = {
+    # Detect staleness before building the row (reads existing CSV tail)
+    spot_stale = detect_spot_stale(csv_file, gold_spot_avg)
+    if spot_stale:
+        print(f"  ⚠ Spot price appears stale (unchanged for {STALE_CONSEC_RUNS}+ runs)")
+
+    # Full row with all columns including spot_stale
+    full_row = {
         'timestamp':               result['last_updated'],
         'uob_100g_buy':            uob.get('100g_cast_buy', '')       if isinstance(uob, dict)  else '',
         'uob_100g_sell':           uob.get('100g_cast_sell', '')      if isinstance(uob, dict)  else '',
@@ -418,7 +478,7 @@ def main():
         'uob_1kg_sell':            uob.get('1kg_cast_sell', '')       if isinstance(uob, dict)  else '',
         'gold_spot_usd_avg':       gold.get('average', '')            if isinstance(gold, dict) else '',
         'gold_spot_cnbc':          gold.get('sources', {}).get('cnbc', '')   if isinstance(gold, dict) else '',
-        'gold_spot_yahoo':         gold.get('sources', {}).get('yahoo', '')  if isinstance(gold, dict) else '',
+        'gold_spot_goldprice_org': gold.get('sources', {}).get('yahoo', '')  if isinstance(gold, dict) else '',
         'gold_cross_validated':    gold.get('cross_validated', '')    if isinstance(gold, dict) else '',
         'usdsgd_avg':              forex.get('average', '')           if isinstance(forex, dict) else '',
         'usdsgd_exchangerate_api': forex.get('sources', {}).get('exchangerate_api', '') if isinstance(forex, dict) else '',
@@ -430,32 +490,72 @@ def main():
         'uob_1kg_premium_pct':     calc.get('uob_1kg_premium_percent', ''),
         'uob_spread_sgd':          calc.get('uob_spread_sgd', ''),
         'uob_spread_pct':          calc.get('uob_spread_percent', ''),
+        'spot_stale':              spot_stale,
     }
 
     try:
-        file_exists = os.path.exists(csv_file)
-        with open(csv_file, 'a', newline='') as f:
-            writer = csv.DictWriter(f, fieldnames=list(row.keys()))
-            if not file_exists:
-                writer.writeheader()
-            writer.writerow(row)
-        print(f"✓ Data appended to {csv_file}")
+        existing_fieldnames = get_csv_fieldnames(csv_file)
+        file_exists = existing_fieldnames is not None
+
+        if file_exists and 'spot_stale' not in existing_fieldnames:
+            # Existing file pre-dates spot_stale column; add it to header by
+            # rewriting the header line, then append the row with all columns.
+            with open(csv_file, 'r', newline='') as f:
+                content = f.read()
+            old_header = content.split('\n')[0]
+            new_header = old_header + ',spot_stale'
+            content = new_header + content[len(old_header):]
+            with open(csv_file, 'w', newline='') as f:
+                f.write(content)
+            print(f"  ↳ Added spot_stale column to existing {csv_file} header")
+            file_exists = False  # treat as new so DictWriter writes header (we already did)
+            file_exists = True   # but actually skip header — data rows already have no spot_stale
+
+            # Just append the row with the new column
+            with open(csv_file, 'a', newline='') as f:
+                writer = csv.DictWriter(f, fieldnames=list(full_row.keys()))
+                writer.writerow(full_row)
+        else:
+            with open(csv_file, 'a', newline='') as f:
+                writer = csv.DictWriter(f, fieldnames=list(full_row.keys()))
+                if not file_exists:
+                    writer.writeheader()
+                writer.writerow(full_row)
+
+        print(f"✓ Data appended to {csv_file} (spot_stale={spot_stale})")
     except Exception as e:
         print(f"⚠ Failed to update {csv_file}: {e}")
 
     # =================================================================
     # APPEND TO data/YYYY.csv  (annual)
     # =================================================================
-    year_key = datetime.utcnow().strftime('%Y')
+    year_key = datetime.now(timezone.utc).strftime('%Y')
     annual_csv_file = f'data/{year_key}.csv'
 
     try:
-        file_exists = os.path.exists(annual_csv_file)
-        with open(annual_csv_file, 'a', newline='') as f:
-            writer = csv.DictWriter(f, fieldnames=list(row.keys()))
-            if not file_exists:
-                writer.writeheader()
-            writer.writerow(row)
+        existing_fieldnames = get_csv_fieldnames(annual_csv_file)
+        file_exists = existing_fieldnames is not None
+
+        if file_exists and 'spot_stale' not in existing_fieldnames:
+            with open(annual_csv_file, 'r', newline='') as f:
+                content = f.read()
+            old_header = content.split('\n')[0]
+            new_header = old_header + ',spot_stale'
+            content = new_header + content[len(old_header):]
+            with open(annual_csv_file, 'w', newline='') as f:
+                f.write(content)
+            print(f"  ↳ Added spot_stale column to existing {annual_csv_file} header")
+
+            with open(annual_csv_file, 'a', newline='') as f:
+                writer = csv.DictWriter(f, fieldnames=list(full_row.keys()))
+                writer.writerow(full_row)
+        else:
+            with open(annual_csv_file, 'a', newline='') as f:
+                writer = csv.DictWriter(f, fieldnames=list(full_row.keys()))
+                if not file_exists:
+                    writer.writeheader()
+                writer.writerow(full_row)
+
         print(f"✓ Data appended to {annual_csv_file}")
     except Exception as e:
         print(f"⚠ Failed to update {annual_csv_file}: {e}")
@@ -486,11 +586,12 @@ def main():
     else:
         print(f"  - CNBC: {NO_DATA}")
     if gold_b['success']:
-        print(f"  - Yahoo Finance: ${gold_b['price']:.2f}")
+        print(f"  - {gold_b['source']}: ${gold_b['price']:.2f}")
     else:
         print(f"  - Yahoo Finance: {NO_DATA}")
     if gold_spot_avg:
         print(f"  Average: ${gold_spot_avg:.2f}/oz")
+        print(f"  Stale:   {spot_stale}")
     else:
         print(f"  Average: {NO_DATA}")
 
@@ -533,6 +634,9 @@ def main():
             print(f"⚠ Gold spot: Only {len(gold_sources_data)} source(s) - need 2 for validation")
         if not forex_ok:
             print(f"⚠ Forex USD/SGD: Only {len(forex_sources_data)} source(s) - need 2 for validation")
+
+    if spot_stale:
+        print(f"⚠ Spot price stale: same value for {STALE_CONSEC_RUNS}+ consecutive runs")
 
     if uob_data['success']:
         print("✓ UOB prices fetched successfully")
