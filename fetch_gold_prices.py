@@ -163,25 +163,38 @@ def fetch_cnbc_gold():
         return {'success': False, 'error': str(e), 'price': 0}
 
 
-def fetch_yfinance_gold():
-    """Gold spot source B: Yahoo Finance XAUUSD=X (24/7 OTC), falling back to GC=F futures.
+def fetch_goldprice_org():
+    """Gold spot source B: GoldPrice.org data API, falling back to yfinance GC=F.
 
-    XAUUSD=X is the interbank OTC forex spot rate for gold and updates continuously
-    including weekends, unlike GC=F (COMEX futures) which freezes after Friday close.
+    GoldPrice.org aggregates interbank OTC feeds and continues updating outside
+    COMEX hours, giving better weekend coverage than exchange-based sources.
+    GC=F (COMEX futures) is used as a fallback if the API is unreachable.
     """
+    # Primary: GoldPrice.org widget data API
+    try:
+        url = "https://data-asg.goldprice.org/dbXRates/USD"
+        headers = {**HEADERS, 'Origin': 'https://goldprice.org', 'Referer': 'https://goldprice.org/'}
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+
+        for item in data.get('items', []):
+            if item.get('curr') == 'USD':
+                price = float(item['xauPrice'])
+                if 1000 < price < 10000:
+                    return {'success': True, 'price': price, 'source': 'GoldPrice.org'}
+
+    except Exception as e:
+        print(f"  ⚠ GoldPrice.org failed ({e}), trying GC=F fallback...")
+
+    # Fallback: yfinance GC=F COMEX futures
     try:
         import yfinance as yf
-
-        for ticker_sym in ["XAUUSD=X", "GC=F"]:
-            try:
-                ticker = yf.Ticker(ticker_sym)
-                price = ticker.fast_info.last_price
-                if price and 1000 < float(price) < 10000:
-                    return {'success': True, 'price': float(price), 'source': f'Yahoo Finance ({ticker_sym})'}
-            except Exception:
-                continue
-
-        return {'success': False, 'error': 'All tickers failed or price out of range', 'price': 0}
+        ticker = yf.Ticker("GC=F")
+        price = ticker.fast_info.last_price
+        if price and 1000 < float(price) < 10000:
+            return {'success': True, 'price': float(price), 'source': 'Yahoo Finance (GC=F)'}
+        return {'success': False, 'error': f'GC=F price out of range or missing: {price}', 'price': 0}
 
     except Exception as e:
         return {'success': False, 'error': str(e), 'price': 0}
@@ -297,12 +310,12 @@ def main():
         print(f"  ✗ CNBC Gold: Failed - {gold_a.get('error', 'unknown')}")
 
     # --- Gold Spot Source B ---
-    print("\n[3/5] Fetching XAUUSD from Yahoo Finance (XAUUSD=X, 24/7 OTC)...")
-    gold_b = fetch_yfinance_gold()
+    print("\n[3/5] Fetching XAUUSD from GoldPrice.org (OTC, with GC=F fallback)...")
+    gold_b = fetch_goldprice_org()
     if gold_b['success']:
         print(f"  ✓ {gold_b['source']}: ${gold_b['price']:.2f}/oz")
     else:
-        print(f"  ✗ Yahoo Finance Gold: Failed - {gold_b.get('error', 'unknown')}")
+        print(f"  ✗ GoldPrice.org/GC=F: Failed - {gold_b.get('error', 'unknown')}")
 
     # --- Forex Source A ---
     print("\n[4/5] Fetching USD/SGD from ExchangeRate-API...")
