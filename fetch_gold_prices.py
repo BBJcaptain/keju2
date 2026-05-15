@@ -40,7 +40,7 @@ STALE_CONSEC_RUNS = 2  # flag stale after this many unchanged consecutive runs
 # =============================================================================
 
 def fetch_uob_prices():
-    """Fetch UOB cast 1kg and 100g gold bar prices from the JSON API."""
+    """Fetch UOB cast 1kg, 100g, and GSA gold prices from the JSON API."""
     errors = []
 
     try:
@@ -52,6 +52,7 @@ def fetch_uob_prices():
         data = response.json()
         argor_data = None
         cast_data = None
+        gsa_data = None
 
         for item in data.get('types', []):
             description = str(item.get('description', '')).upper()
@@ -77,6 +78,13 @@ def fetch_uob_prices():
                     }
                     print(f"  ✓ Found: Cast 1kg - Buy {buy_price}, Sell {sell_price}")
 
+                elif 'GSA' in description and buy_price > 0 and sell_price > 0:
+                    gsa_data = {
+                        'buy': buy_price,
+                        'sell': sell_price,
+                    }
+                    print(f"  ✓ Found: GSA - Buy {buy_price}, Sell {sell_price} SGD/gram")
+
             except (ValueError, TypeError) as e:
                 print(f"  ⚠ Price parsing error for item: {e}")
                 continue
@@ -88,7 +96,9 @@ def fetch_uob_prices():
                     '100g_cast_buy': argor_data['buy'],
                     '100g_cast_sell': argor_data['sell'],
                     '1kg_cast_buy': cast_data['buy'],
-                    '1kg_cast_sell': cast_data['sell']
+                    '1kg_cast_sell': cast_data['sell'],
+                    'gsa_buy': gsa_data['buy'] if gsa_data else None,
+                    'gsa_sell': gsa_data['sell'] if gsa_data else None,
                 },
                 'source': 'UOB (API)'
             }
@@ -482,6 +492,14 @@ def main():
     if spot_stale:
         print(f"  ⚠ Spot price appears stale (unchanged for {STALE_CONSEC_RUNS}+ runs)")
 
+    # GSA spread (SGD/gram; empty string if prices unavailable)
+    _gsa_sell = uob.get('gsa_sell') if isinstance(uob, dict) else None
+    _gsa_buy  = uob.get('gsa_buy')  if isinstance(uob, dict) else None
+    if _gsa_sell and _gsa_buy and _gsa_sell > 0:
+        _gsa_spread_pct = round((_gsa_sell - _gsa_buy) / _gsa_sell * 100, 2)
+    else:
+        _gsa_spread_pct = ''
+
     # Full row with all columns including spot_stale
     full_row = {
         'timestamp':               result['last_updated'],
@@ -504,33 +522,33 @@ def main():
         'uob_spread_sgd':          calc.get('uob_spread_sgd', ''),
         'uob_spread_pct':          calc.get('uob_spread_percent', ''),
         'spot_stale':              spot_stale,
+        'uob_gsa_sell':            _gsa_sell if _gsa_sell is not None else '',
+        'uob_gsa_buy':             _gsa_buy  if _gsa_buy  is not None else '',
+        'uob_gsa_spread_pct':      _gsa_spread_pct,
     }
 
     try:
         existing_fieldnames = get_csv_fieldnames(csv_file)
         file_exists = existing_fieldnames is not None
+        new_fieldnames = list(full_row.keys())
+        missing_cols = [f for f in new_fieldnames if f not in (existing_fieldnames or [])]
 
-        if file_exists and 'spot_stale' not in existing_fieldnames:
-            # Existing file pre-dates spot_stale column; add it to header by
-            # rewriting the header line, then append the row with all columns.
+        if file_exists and missing_cols:
+            # Existing file pre-dates some columns; extend the header in-place.
             with open(csv_file, 'r', newline='') as f:
                 content = f.read()
             old_header = content.split('\n')[0]
-            new_header = old_header + ',spot_stale'
+            new_header = old_header + ',' + ','.join(missing_cols)
             content = new_header + content[len(old_header):]
             with open(csv_file, 'w', newline='') as f:
                 f.write(content)
-            print(f"  ↳ Added spot_stale column to existing {csv_file} header")
-            file_exists = False  # treat as new so DictWriter writes header (we already did)
-            file_exists = True   # but actually skip header — data rows already have no spot_stale
-
-            # Just append the row with the new column
+            print(f"  ↳ Added columns to existing {csv_file}: {missing_cols}")
             with open(csv_file, 'a', newline='') as f:
-                writer = csv.DictWriter(f, fieldnames=list(full_row.keys()))
+                writer = csv.DictWriter(f, fieldnames=new_fieldnames)
                 writer.writerow(full_row)
         else:
             with open(csv_file, 'a', newline='') as f:
-                writer = csv.DictWriter(f, fieldnames=list(full_row.keys()))
+                writer = csv.DictWriter(f, fieldnames=new_fieldnames)
                 if not file_exists:
                     writer.writeheader()
                 writer.writerow(full_row)
@@ -548,23 +566,23 @@ def main():
     try:
         existing_fieldnames = get_csv_fieldnames(annual_csv_file)
         file_exists = existing_fieldnames is not None
+        missing_cols = [f for f in new_fieldnames if f not in (existing_fieldnames or [])]
 
-        if file_exists and 'spot_stale' not in existing_fieldnames:
+        if file_exists and missing_cols:
             with open(annual_csv_file, 'r', newline='') as f:
                 content = f.read()
             old_header = content.split('\n')[0]
-            new_header = old_header + ',spot_stale'
+            new_header = old_header + ',' + ','.join(missing_cols)
             content = new_header + content[len(old_header):]
             with open(annual_csv_file, 'w', newline='') as f:
                 f.write(content)
-            print(f"  ↳ Added spot_stale column to existing {annual_csv_file} header")
-
+            print(f"  ↳ Added columns to existing {annual_csv_file}: {missing_cols}")
             with open(annual_csv_file, 'a', newline='') as f:
-                writer = csv.DictWriter(f, fieldnames=list(full_row.keys()))
+                writer = csv.DictWriter(f, fieldnames=new_fieldnames)
                 writer.writerow(full_row)
         else:
             with open(annual_csv_file, 'a', newline='') as f:
-                writer = csv.DictWriter(f, fieldnames=list(full_row.keys()))
+                writer = csv.DictWriter(f, fieldnames=new_fieldnames)
                 if not file_exists:
                     writer.writeheader()
                 writer.writerow(full_row)
@@ -590,6 +608,10 @@ def main():
             print(f"  100g Argor - Buy: ${uob_data['prices']['100g_cast_buy']:,.2f} SGD")
         if uob_data['prices'].get('100g_cast_sell'):
             print(f"  100g Argor - Sell: ${uob_data['prices']['100g_cast_sell']:,.2f} SGD")
+        if uob_data['prices'].get('gsa_sell') and uob_data['prices'].get('gsa_buy'):
+            print(f"  GSA - Sell: ${uob_data['prices']['gsa_sell']:.4f} SGD/gram  Buy: ${uob_data['prices']['gsa_buy']:.4f} SGD/gram")
+        else:
+            print(f"  GSA: {NO_DATA}")
     else:
         print(f"  {NO_DATA}")
 
