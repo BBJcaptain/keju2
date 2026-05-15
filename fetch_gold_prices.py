@@ -534,15 +534,17 @@ def main():
         missing_cols = [f for f in new_fieldnames if f not in (existing_fieldnames or [])]
 
         if file_exists and missing_cols:
-            # Existing file pre-dates some columns; extend the header in-place.
+            # Existing file pre-dates some columns; replace the first line with
+            # the full correct header (idempotent: concurrent runs all write the
+            # same string, so repeated execution cannot compound the header).
             with open(csv_file, 'r', newline='') as f:
                 content = f.read()
             old_header = content.split('\n')[0]
-            new_header = old_header + ',' + ','.join(missing_cols)
+            new_header = ','.join(new_fieldnames)
             content = new_header + content[len(old_header):]
             with open(csv_file, 'w', newline='') as f:
                 f.write(content)
-            print(f"  ↳ Added columns to existing {csv_file}: {missing_cols}")
+            print(f"  ↳ Updated header of existing {csv_file}")
             with open(csv_file, 'a', newline='') as f:
                 writer = csv.DictWriter(f, fieldnames=new_fieldnames)
                 writer.writerow(full_row)
@@ -572,11 +574,11 @@ def main():
             with open(annual_csv_file, 'r', newline='') as f:
                 content = f.read()
             old_header = content.split('\n')[0]
-            new_header = old_header + ',' + ','.join(missing_cols)
+            new_header = ','.join(new_fieldnames)
             content = new_header + content[len(old_header):]
             with open(annual_csv_file, 'w', newline='') as f:
                 f.write(content)
-            print(f"  ↳ Added columns to existing {annual_csv_file}: {missing_cols}")
+            print(f"  ↳ Updated header of existing {annual_csv_file}")
             with open(annual_csv_file, 'a', newline='') as f:
                 writer = csv.DictWriter(f, fieldnames=new_fieldnames)
                 writer.writerow(full_row)
