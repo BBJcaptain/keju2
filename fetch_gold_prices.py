@@ -341,16 +341,19 @@ def _load_price_history(annual_csv_file):
             with open(csv_path, 'r', newline='') as f:
                 for row in csv.DictReader(f):
                     try:
-                        ts = datetime.fromisoformat(row['timestamp'].replace('Z', '+00:00'))
-                        spot_raw = row.get('gold_spot_usd_avg', '').strip()
+                        ts_raw = (row.get('timestamp') or '').replace('Z', '+00:00')
+                        if not ts_raw:
+                            continue
+                        ts = datetime.fromisoformat(ts_raw)
+                        spot_raw = (row.get('gold_spot_usd_avg') or '').strip()
                         if not spot_raw:
                             continue
                         spot = float(spot_raw)
                         if not (1000 < spot < 10000):
                             continue
                         spot_series.append((ts, spot))
-                        uob_raw = row.get('uob_1kg_sell', '').strip()
-                        gsa_raw = row.get('uob_gsa_sell', '').strip()
+                        uob_raw = (row.get('uob_1kg_sell') or '').strip()
+                        gsa_raw = (row.get('uob_gsa_sell') or '').strip()
                         uob_series.append((ts, float(uob_raw) if uob_raw else None))
                         gsa_series.append((ts, float(gsa_raw) if gsa_raw else None))
                     except (ValueError, TypeError):
@@ -522,26 +525,43 @@ def compute_technical_indicators(annual_csv_file):
 # =============================================================================
 
 _CORR_TICKERS = {
-    'XAG=X':   'xag_usd',
+    'SI=F':    'xag_usd',   # COMEX Silver futures
     '^VIX':    'vix',
-    'DX=F':    'dxy',
+    'DX-Y.NYB':'dxy',       # US Dollar Index
     '^GSPC':   'spx',
     'CL=F':    'wti_oil',
     'BTC-USD': 'btc_usd',
-    'XPT=X':   'xpt_usd',
+    'PL=F':    'xpt_usd',   # COMEX Platinum futures
 }
+
+
+def _yf_last_price(ticker):
+    """Get last price via fast_info, falling back to history() for tickers where fast_info fails."""
+    import yfinance as yf
+    t = yf.Ticker(ticker)
+    try:
+        p = t.fast_info.last_price
+        if p is not None:
+            return float(p)
+    except Exception:
+        pass
+    hist = t.history(period='5d')
+    if not hist.empty:
+        closes = hist['Close'].dropna()
+        if not closes.empty:
+            return float(closes.iloc[-1])
+    return None
 
 
 def fetch_correlated_assets():
     """Fetch last price for silver, VIX, DXY, SPX, crude oil, BTC, platinum via yfinance."""
     empty = {col: '' for col in _CORR_TICKERS.values()}
     try:
-        import yfinance as yf
         result = {}
         for ticker, col in _CORR_TICKERS.items():
             try:
-                price = yf.Ticker(ticker).fast_info.last_price
-                result[col] = round(float(price), 4) if price is not None else ''
+                price = _yf_last_price(ticker)
+                result[col] = round(price, 4) if price is not None else ''
                 if result[col] != '':
                     print(f"  {col}: {result[col]}")
             except Exception as e:
@@ -568,12 +588,11 @@ def fetch_rates():
     """Fetch US Treasury yields (3M, 10Y, 30Y) via yfinance. Values in %."""
     empty = {col: '' for col in _RATE_TICKERS.values()}
     try:
-        import yfinance as yf
         result = {}
         for ticker, col in _RATE_TICKERS.items():
             try:
-                price = yf.Ticker(ticker).fast_info.last_price
-                result[col] = round(float(price), 4) if price is not None else ''
+                price = _yf_last_price(ticker)
+                result[col] = round(price, 4) if price is not None else ''
                 if result[col] != '':
                     print(f"  {col}: {result[col]}%")
             except Exception as e:
@@ -628,42 +647,39 @@ def fetch_cot_data(annual_csv_file):
         return cached
 
     try:
-        url = f"https://www.cftc.gov/files/dea/history/fut_disagg_txtonly_{now.year}.zip"
-        resp = requests.get(url, headers=HEADERS, timeout=45)
+        # CFTC Socrata public API — disaggregated COT, market code 088691 (COMEX Gold 100 Troy Oz)
+        url = "https://publicreporting.cftc.gov/resource/6dca-aqww.json"
+        params = {
+            'cftc_contract_market_code': CFTC_GOLD_CODE,
+            '$order': 'report_date_as_yyyy_mm_dd DESC',
+            '$limit': '1',
+        }
+        resp = requests.get(url, params=params, headers=HEADERS, timeout=30)
         resp.raise_for_status()
+        rows = resp.json()
 
-        with zipfile.ZipFile(io.BytesIO(resp.content)) as z:
-            fname = next(n for n in z.namelist() if n.lower().endswith('.txt'))
-            with z.open(fname) as f:
-                content = f.read().decode('latin-1')
-
-        gold_rows = []
-        for row in csv.DictReader(io.StringIO(content)):
-            code = row.get('CFTC_Contract_Market_Code', '')
-            name = row.get('Market_and_Exchange_Names', '').upper()
-            if CFTC_GOLD_CODE in code or ('GOLD' in name and '100 TROY' in name):
-                gold_rows.append(row)
-
-        if not gold_rows:
-            print("  COT: GOLD 100 Troy Oz rows not found in CFTC file")
+        if not rows:
+            print("  COT: no data returned from CFTC API")
             return cached or empty
 
-        latest = gold_rows[-1]
+        r = rows[0]
 
         def _int(key):
             try:
-                return int(str(latest.get(key, '0')).replace(',', '').strip() or '0')
+                return int(str(r.get(key, '0') or '0').replace(',', '').strip())
             except (ValueError, TypeError):
                 return ''
 
-        nc_long  = _int('NonComm_Positions_Long_All')
-        nc_short = _int('NonComm_Positions_Short_All')
-        c_long   = _int('Comm_Positions_Long_All')
-        c_short  = _int('Comm_Positions_Short_All')
+        nc_long  = _int('noncomm_positions_long_all')
+        nc_short = _int('noncomm_positions_short_all')
+        c_long   = _int('comm_positions_long_all')
+        c_short  = _int('comm_positions_short_all')
         nc_net   = nc_long  - nc_short if isinstance(nc_long,  int) and isinstance(nc_short, int) else ''
         c_net    = c_long   - c_short  if isinstance(c_long,   int) and isinstance(c_short,  int) else ''
 
-        cot_date = latest.get('Report_Date_as_YYYY-MM-DD', '')
+        cot_date = r.get('report_date_as_yyyy_mm_dd', '')
+        if cot_date and 'T' in cot_date:
+            cot_date = cot_date.split('T')[0]
         print(f"  COT fresh: date={cot_date}  net non-comm={nc_net}  net comm={c_net}")
 
         return {
