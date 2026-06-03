@@ -141576,5 +141576,52 @@
       "uob_spread_sgd": -2940.0,
       "uob_spread_percent": -1.61
     }
+  },
+  {
+    "last_updated": "2026-06-03T07:26:58.428986+00:00",
+    "uob_prices_sgd": {
+      "100g_cast_buy": 18255.0,
+      "100g_cast_sell": 18634.0,
+      "1kg_cast_buy": 182566.0,
+      "1kg_cast_sell": 185506.0,
+      "gsa_buy": 182.56,
+      "gsa_sell": 185.32
+    },
+    "gold_spot_usd_per_oz": {
+      "average": 4461.17,
+      "sources": {
+        "cnbc": 4461.38,
+        "yahoo": 4460.955
+      },
+      "source_count": 2,
+      "cross_validated": true
+    },
+    "usd_sgd_rate": {
+      "average": 1.2794,
+      "sources": {
+        "exchangerate_api": 1.279427,
+        "frankfurter": "No Data"
+      },
+      "source_count": 1,
+      "cross_validated": false
+    },
+    "status": {
+      "uob_success": true,
+      "gold_spot_sources": 2,
+      "forex_sources": 1,
+      "gold_cross_validated": true,
+      "forex_cross_validated": false
+    },
+    "errors": {
+      "frankfurter": "520 Server Error: <none> for url: https://api.frankfurter.dev/v1/latest?base=USD&symbols=SGD"
+    },
+    "calculated": {
+      "spot_price_sgd_per_gram": 183.51,
+      "spot_price_sgd_per_kg": 183507.91,
+      "uob_1kg_premium_sgd": -941.91,
+      "uob_1kg_premium_percent": -0.51,
+      "uob_spread_sgd": -2940.0,
+      "uob_spread_percent": -1.61
+    }
   }
 ]
