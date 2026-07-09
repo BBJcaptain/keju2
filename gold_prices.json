@@ -1,47 +1,45 @@
 {
-  "last_updated": "2026-07-09T00:01:04.295906+00:00",
+  "last_updated": "2026-07-09T00:18:14.789975+00:00",
   "uob_prices_sgd": {
-    "100g_cast_buy": 16715.0,
-    "100g_cast_sell": 17094.0,
-    "1kg_cast_buy": 167163.0,
-    "1kg_cast_sell": 170103.0,
-    "gsa_buy": 167.16,
-    "gsa_sell": 169.92
+    "100g_cast_buy": 16831.0,
+    "100g_cast_sell": 17210.0,
+    "1kg_cast_buy": 168319.0,
+    "1kg_cast_sell": 171260.0,
+    "gsa_buy": 168.32,
+    "gsa_sell": 171.07
   },
   "gold_spot_usd_per_oz": {
-    "average": 4077.48,
+    "average": 4084.36,
     "sources": {
-      "cnbc": 4075.27,
-      "yahoo": 4079.7
+      "cnbc": 4084.49,
+      "yahoo": 4084.24
     },
     "source_count": 2,
     "cross_validated": true
   },
   "usd_sgd_rate": {
-    "average": 1.2925,
+    "average": 1.2933,
     "sources": {
       "exchangerate_api": 1.292501,
-      "frankfurter": "No Data"
+      "frankfurter": 1.294
     },
-    "source_count": 1,
-    "cross_validated": false
+    "source_count": 2,
+    "cross_validated": true
   },
   "status": {
     "uob_success": true,
     "gold_spot_sources": 2,
-    "forex_sources": 1,
+    "forex_sources": 2,
     "gold_cross_validated": true,
-    "forex_cross_validated": false
+    "forex_cross_validated": true
   },
-  "errors": {
-    "frankfurter": "521 Server Error: <none> for url: https://api.frankfurter.dev/v1/latest?base=USD&symbols=SGD"
-  },
+  "errors": {},
   "calculated": {
-    "spot_price_sgd_per_gram": 169.44,
-    "spot_price_sgd_per_kg": 169439.24,
-    "uob_1kg_premium_sgd": -2276.24,
-    "uob_1kg_premium_percent": -1.34,
-    "uob_spread_sgd": -2940.0,
-    "uob_spread_percent": -1.76
+    "spot_price_sgd_per_gram": 169.82,
+    "spot_price_sgd_per_kg": 169823.56,
+    "uob_1kg_premium_sgd": -1504.56,
+    "uob_1kg_premium_percent": -0.89,
+    "uob_spread_sgd": -2941.0,
+    "uob_spread_percent": -1.75
   }
 }
