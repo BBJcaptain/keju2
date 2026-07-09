@@ -1,5 +1,5 @@
 {
-  "last_updated": "2026-07-09T01:43:38.603605+00:00",
+  "last_updated": "2026-07-09T02:04:52.770084+00:00",
   "uob_prices_sgd": {
     "100g_cast_buy": 16829.0,
     "100g_cast_sell": 17208.0,
@@ -9,10 +9,10 @@
     "gsa_sell": 171.05
   },
   "gold_spot_usd_per_oz": {
-    "average": 4072.95,
+    "average": 4075.53,
     "sources": {
-      "cnbc": 4072.74,
-      "yahoo": 4073.16
+      "cnbc": 4075.73,
+      "yahoo": 4075.32
     },
     "source_count": 2,
     "cross_validated": true
@@ -35,10 +35,10 @@
   },
   "errors": {},
   "calculated": {
-    "spot_price_sgd_per_gram": 169.44,
-    "spot_price_sgd_per_kg": 169438.05,
-    "uob_1kg_premium_sgd": -1140.05,
-    "uob_1kg_premium_percent": -0.67,
+    "spot_price_sgd_per_gram": 169.55,
+    "spot_price_sgd_per_kg": 169545.17,
+    "uob_1kg_premium_sgd": -1247.17,
+    "uob_1kg_premium_percent": -0.74,
     "uob_spread_sgd": -2939.0,
     "uob_spread_percent": -1.75
   }
