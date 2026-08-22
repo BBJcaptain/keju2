@@ -1,5 +1,5 @@
 {
-  "last_updated": "2026-08-21T23:58:31.278456+00:00",
+  "last_updated": "2026-08-22T00:22:30.618178+00:00",
   "uob_prices_sgd": {
     "100g_cast_buy": 18559.0,
     "100g_cast_sell": 18935.0,
@@ -18,9 +18,9 @@
     "cross_validated": true
   },
   "usd_sgd_rate": {
-    "average": 1.2701,
+    "average": 1.2688,
     "sources": {
-      "exchangerate_api": 1.271848,
+      "exchangerate_api": 1.269243,
       "frankfurter": 1.2683
     },
     "source_count": 2,
@@ -35,10 +35,10 @@
   },
   "errors": {},
   "calculated": {
-    "spot_price_sgd_per_gram": 187.96,
-    "spot_price_sgd_per_kg": 187960.31,
-    "uob_1kg_premium_sgd": -2357.31,
-    "uob_1kg_premium_percent": -1.25,
+    "spot_price_sgd_per_gram": 187.77,
+    "spot_price_sgd_per_kg": 187767.56,
+    "uob_1kg_premium_sgd": -2164.56,
+    "uob_1kg_premium_percent": -1.15,
     "uob_spread_sgd": -2920.0,
     "uob_spread_percent": -1.57
   }
