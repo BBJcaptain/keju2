@@ -1,5 +1,5 @@
 {
-  "last_updated": "2026-08-25T07:11:08.441439+00:00",
+  "last_updated": "2026-08-25T07:25:11.055496+00:00",
   "uob_prices_sgd": {
     "100g_cast_buy": 18807.0,
     "100g_cast_sell": 19184.0,
@@ -9,38 +9,36 @@
     "gsa_sell": 190.83
   },
   "gold_spot_usd_per_oz": {
-    "average": 4640.51,
+    "average": 4641.81,
     "sources": {
-      "cnbc": 4641.08,
-      "yahoo": 4639.95
+      "cnbc": 4641.63,
+      "yahoo": 4641.98
     },
     "source_count": 2,
     "cross_validated": true
   },
   "usd_sgd_rate": {
-    "average": 1.2703,
+    "average": 1.2704,
     "sources": {
       "exchangerate_api": 1.270334,
-      "frankfurter": "No Data"
+      "frankfurter": 1.2705
     },
-    "source_count": 1,
-    "cross_validated": false
+    "source_count": 2,
+    "cross_validated": true
   },
   "status": {
     "uob_success": true,
     "gold_spot_sources": 2,
-    "forex_sources": 1,
+    "forex_sources": 2,
     "gold_cross_validated": true,
-    "forex_cross_validated": false
+    "forex_cross_validated": true
   },
-  "errors": {
-    "frankfurter": "HTTPSConnectionPool(host='api.frankfurter.dev', port=443): Read timed out. (read timeout=10)"
-  },
+  "errors": {},
   "calculated": {
-    "spot_price_sgd_per_gram": 189.53,
-    "spot_price_sgd_per_kg": 189528.64,
-    "uob_1kg_premium_sgd": -1444.64,
-    "uob_1kg_premium_percent": -0.76,
+    "spot_price_sgd_per_gram": 189.59,
+    "spot_price_sgd_per_kg": 189593.71,
+    "uob_1kg_premium_sgd": -1509.71,
+    "uob_1kg_premium_percent": -0.8,
     "uob_spread_sgd": -2930.0,
     "uob_spread_percent": -1.56
   }
