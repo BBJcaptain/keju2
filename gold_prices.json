@@ -1,11 +1,11 @@
 {
-  "last_updated": "2026-09-01T07:41:11.245130+00:00",
+  "last_updated": "2026-09-01T07:52:30.460050+00:00",
   "uob_prices_sgd": "No Data",
   "gold_spot_usd_per_oz": {
-    "average": 4416.9,
+    "average": 4420.39,
     "sources": {
-      "cnbc": 4415.97,
-      "yahoo": 4417.825
+      "cnbc": 4420.28,
+      "yahoo": 4420.495
     },
     "source_count": 2,
     "cross_validated": true
@@ -30,7 +30,7 @@
     "uob": "Network error: HTTPSConnectionPool(host='www.uobgroup.com', port=443): Read timed out. (read timeout=30)"
   },
   "calculated": {
-    "spot_price_sgd_per_gram": 180.66,
-    "spot_price_sgd_per_kg": 180663.23
+    "spot_price_sgd_per_gram": 180.81,
+    "spot_price_sgd_per_kg": 180805.98
   }
 }
