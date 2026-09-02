@@ -1,18 +1,11 @@
 {
-  "last_updated": "2026-09-02T00:39:10.401934+00:00",
-  "uob_prices_sgd": {
-    "100g_cast_buy": 17610.0,
-    "100g_cast_sell": 17985.0,
-    "1kg_cast_buy": 176108.0,
-    "1kg_cast_sell": 179023.0,
-    "gsa_buy": 176.11,
-    "gsa_sell": 178.84
-  },
+  "last_updated": "2026-09-02T01:06:48.455289+00:00",
+  "uob_prices_sgd": "No Data",
   "gold_spot_usd_per_oz": {
-    "average": 4326.62,
+    "average": 4306.56,
     "sources": {
-      "cnbc": 4328.76,
-      "yahoo": 4324.49
+      "cnbc": 4305.43,
+      "yahoo": 4307.69
     },
     "source_count": 2,
     "cross_validated": true
@@ -27,19 +20,17 @@
     "cross_validated": true
   },
   "status": {
-    "uob_success": true,
+    "uob_success": false,
     "gold_spot_sources": 2,
     "forex_sources": 2,
     "gold_cross_validated": true,
     "forex_cross_validated": true
   },
-  "errors": {},
+  "errors": {
+    "uob": "Network error: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+  },
   "calculated": {
-    "spot_price_sgd_per_gram": 177.11,
-    "spot_price_sgd_per_kg": 177109.17,
-    "uob_1kg_premium_sgd": -1001.17,
-    "uob_1kg_premium_percent": -0.57,
-    "uob_spread_sgd": -2915.0,
-    "uob_spread_percent": -1.66
+    "spot_price_sgd_per_gram": 176.29,
+    "spot_price_sgd_per_kg": 176287.82
   }
 }
