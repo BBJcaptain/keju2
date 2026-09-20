@@ -1,5 +1,5 @@
 {
-  "last_updated": "2026-09-20T19:01:58.061601+00:00",
+  "last_updated": "2026-09-20T19:05:57.474559+00:00",
   "uob_prices_sgd": "No Data",
   "gold_spot_usd_per_oz": {
     "average": 4377.41,
@@ -27,7 +27,7 @@
     "forex_cross_validated": true
   },
   "errors": {
-    "uob": "Network error: 503 Server Error: Service Unavailable for url: https://www.uobgroup.com/wsm/gold-silver"
+    "uob": "Network error: HTTPSConnectionPool(host='www.uobgroup.com', port=443): Read timed out. (read timeout=30)"
   },
   "calculated": {
     "spot_price_sgd_per_gram": 179.79,
