@@ -1,13 +1,6 @@
 {
-  "last_updated": "2026-11-15T11:33:20.618599+00:00",
-  "uob_prices_sgd": {
-    "100g_cast_buy": 15990.0,
-    "100g_cast_sell": 16366.0,
-    "1kg_cast_buy": 159910.0,
-    "1kg_cast_sell": 162826.0,
-    "gsa_buy": 159.91,
-    "gsa_sell": 162.64
-  },
+  "last_updated": "2026-11-15T16:57:16.621215+00:00",
+  "uob_prices_sgd": "No Data",
   "gold_spot_usd_per_oz": {
     "average": 3879.3,
     "sources": {
@@ -27,19 +20,17 @@
     "cross_validated": true
   },
   "status": {
-    "uob_success": true,
+    "uob_success": false,
     "gold_spot_sources": 2,
     "forex_sources": 2,
     "gold_cross_validated": true,
     "forex_cross_validated": true
   },
-  "errors": {},
+  "errors": {
+    "uob": "Network error: HTTPSConnectionPool(host='www.uobgroup.com', port=443): Read timed out. (read timeout=30)"
+  },
   "calculated": {
     "spot_price_sgd_per_gram": 160.62,
-    "spot_price_sgd_per_kg": 160617.9,
-    "uob_1kg_premium_sgd": -707.9,
-    "uob_1kg_premium_percent": -0.44,
-    "uob_spread_sgd": -2916.0,
-    "uob_spread_percent": -1.82
+    "spot_price_sgd_per_kg": 160617.9
   }
 }
