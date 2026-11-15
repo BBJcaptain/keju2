@@ -538803,5 +538803,41 @@
       "spot_price_sgd_per_gram": 160.84,
       "spot_price_sgd_per_kg": 160844.79
     }
+  },
+  {
+    "last_updated": "2026-11-15T23:13:05.068579+00:00",
+    "uob_prices_sgd": "No Data",
+    "gold_spot_usd_per_oz": {
+      "average": 3885.05,
+      "sources": {
+        "cnbc": 3884.41,
+        "yahoo": 3885.7
+      },
+      "source_count": 2,
+      "cross_validated": true
+    },
+    "usd_sgd_rate": {
+      "average": 1.2878,
+      "sources": {
+        "exchangerate_api": 1.28751,
+        "frankfurter": 1.2881
+      },
+      "source_count": 2,
+      "cross_validated": true
+    },
+    "status": {
+      "uob_success": false,
+      "gold_spot_sources": 2,
+      "forex_sources": 2,
+      "gold_cross_validated": true,
+      "forex_cross_validated": true
+    },
+    "errors": {
+      "uob": "Network error: HTTPSConnectionPool(host='www.uobgroup.com', port=443): Read timed out. (read timeout=30)"
+    },
+    "calculated": {
+      "spot_price_sgd_per_gram": 160.86,
+      "spot_price_sgd_per_kg": 160856.28
+    }
   }
 ]
